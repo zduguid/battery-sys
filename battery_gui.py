@@ -150,7 +150,8 @@ class PowerSupply(object):
 
 if __name__ == "__main__":
     # Bus Parameters
-    PORT = '/dev/cu.usbserial'
+    # PORT = '/dev/cu.usbserial'
+    PORT = '/dev/ttyUSB0'
     BAUD = 9600
     TIME_OUT = 1
     SCAN_TIME = 5
