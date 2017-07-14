@@ -170,10 +170,10 @@ class GUI(object):
         self.scan_time = None 
 
         # custom GUI parameters (i.e. font styles, GUI colors, etc.)
-        self.frame_font = tkFont.Font(family='Helvetica', size=24, weight='bold', slant='italic', underline=1)
-        self.label_font = tkFont.Font(family='Helvetica', size=16)
-        self.label_font_italic = tkFont.Font(family='Helvetica', size=16, slant='italic')
-        self.label_font_bold = tkFont.Font(family='Helvetica', size=16, weight='bold')
+        self.frame_font = tkFont.Font(family='Helvetica', size=16, weight='bold', slant='italic', underline=1)
+        self.label_font = tkFont.Font(family='Helvetica', size=10)
+        self.label_font_italic = tkFont.Font(family='Helvetica', size=10, slant='italic')
+        self.label_font_bold = tkFont.Font(family='Helvetica', size=10, weight='bold')
         self.pad = 5
         self.light_grey = '#ddd'
         self.dark_grey = '#ccc'
@@ -238,10 +238,15 @@ class GUI(object):
         """
         if sys.platform.startswith('win'):
             ports = ['COM%s' % (i + 1) for i in range(256)]
-        elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'): 
-            ports = glob.glob('/dev/cu[A-Za-z]*')
+
+        # check raspberry pi serial ports
+        elif sys.platform.startswith('linux'): 
+            ports = glob.glob('/dev/tty*')
+
+        # check macbook serial ports
         elif sys.platform.startswith('darwin'):
             ports = glob.glob('/dev/cu.*')
+
         else:
             raise EnvironmentError('Unsupported platform')
 
