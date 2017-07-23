@@ -1,16 +1,18 @@
 # /usr/bin/env python3
 #
 # - Models glider performance in terms of range
-# - Allows for graphical display of velocity vs. range relationship
+# - Allows for graphical display of speed vs. range relationship for different current conditions
 #
 # Author: Zach Duguid
-# Last Updated: 07/22/2017
+# Last Updated: 07/23/2017
+
 
 import math
 import numpy as np
 import matplotlib
 from matplotlib import pyplot as plt 
 from mpl_toolkits.basemap import Basemap
+from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.patches import Polygon
 
@@ -52,70 +54,122 @@ class GliderModel(object):
 
 
     def get_range_data(self, constant_transit_pwr, constant_survey_pwr):
-        ''' extracts range data as a function of through-water-velocity and maintains the maximum range achieved   
+        ''' extracts range data as a function of through-water-speed and maintains the maximum range achieved   
         '''
-        # get list of velocties and percents to determine desired data
+        # get list of velocties, ocean currents, and percents to determine desired data
         velocity = [float(element) for element in (np.linspace(0.00, 2.5, 251))]
+        ocean_currents = [str(round(element, 2)) for element in np.linspace(0.00, 1.78, 179)]
         percent = range(101)
-        T_vel_dist = []                     # transit distance as function of velocity
-        S_vel_dist = []                     # survey distance as function of velocity 
-        T_per_dist = []                     # transit distance as function of percent transit travel
-        S_per_dist = []                     # survey distance as function of percent transit travel
-        total_dist = []                     # total distance reached via transit and survey travel
-        self.B_range_v = 0.37               # buoyancy velocity [m/s] 
+
+        # initialize lists for speed vs. range plot for the user specified ocean current speed
+        self.T_vel_dist = []                # transit distance as function of speed
+        self.S_vel_dist = []                # survey distance as function of speed
+        self.T_per_dist = []                # transit distance as function of percent transit travel
+        self.S_per_dist = []                # survey distance as function of percent transit travel
+        self.total_dist = []                # total distance reached via transit and survey travel
+
+        # initialize buoyancy parameters from previously performed study
+        self.B_range_v = 0.37               # buoyancy speed [m/s] 
         self.B_range_p = 6.7                # buoyancy power [W]
-        self.B_range_t = (self.capacity / self.B_range_p)*3600  # buoyancy time [s]
-        self.B_range_x = (self.B_range_v * self.B_range_t)/1000   # buoyance range [km]
+        self.B_range_t = (self.capacity / self.B_range_p)*3600      # buoyancy time [s]
+        self.B_range_x = (self.B_range_v * self.B_range_t)/1000     # buoyance range [km]
 
-        # determine range [km] as a function of velocity [m/s] (v represents through-water-speed)
-        for v in velocity:
+        # initialize 
+        self.T_current_x = []               # transit max range dependent on ocean current c
+        self.S_current_x = []               # survey max range dependent on ocean current c
+        self.T_current_v = []               # transit speed associated with max transit range, ocean current c
+        self.S_current_v = []               # survey speed associated with max transit range, ocean current c
+        self.T_current_p = []               # transit power associated with max transit range, ocean current c
+        self.S_current_p = []               # survey power associated with max transit range, ocean current c
+        self.T_current_y = []               # transit range if traveling at the zero current optimization values
+        self.S_current_y = []               # survey range if traveling at the zero current optimization values
+        self.T_current_i = []               # percent increase in peformance when optimizing with ocean current speed
+        self.S_current_i = []               # percent increase in peformance when optimizing with ocean current speed
 
-            # v_total represents maximum ground speed (when v and self.current_speed are in the same direction)
-            v_total = v + self.current_speed
+        # iterate through different ocean current scenarious, [m/s]
+        for c in ocean_currents:
 
-            # determine propulsive power needed to achieve velocity v 
-            prop_power = self.get_prop_power(v)
+            # reset range values to zero for the new current scenario
+            T_range = 0
+            S_range = 0
 
-            # determine range achieved in transit and survey modes 
-            total_range_T = (self.capacity * 3600/1000 * v_total) / (constant_transit_pwr + prop_power)
-            total_range_S = (self.capacity * 3600/1000 * v_total) / (constant_survey_pwr +  prop_power)
-            prop_range_T = (self.capacity * 3600/1000 * v) / (constant_transit_pwr + prop_power)
-            prop_range_S = (self.capacity * 3600/1000 * v) / (constant_survey_pwr +  prop_power)
-            T_vel_dist.append(total_range_T)
-            S_vel_dist.append(total_range_S)
+            # determine range [km] as a function of speed [m/s] (v represents through-water-speed)
+            for v in velocity:
 
-            # check if new maximum range is achieved for transit and survey mode
-            if total_range_T > self.T_range:
-                self.T_range = total_range_T                            # [km], maximize this term
-                self.T_range_x = prop_range_T                           # [km], use this term when applying ocean currents
-                self.T_range_v = v                                      # [m/s]
-                self.T_range_p = prop_power + constant_transit_pwr      # [W]       
-                self.T_range_t = (self.capacity/self.T_range_p)*3600    # [s]
+                # v_total represents maximum ground speed (when v and self.current_speed are in the same direction)
+                v_total = v + float(c)
 
-            if total_range_S > self.S_range:
-                self.S_range = total_range_S                            # [km], maximize this term
-                self.S_range_x = prop_range_S                           # [km], use this term when applying ocean currents
-                self.S_range_v = v                                      # [m/s]
-                self.S_range_p = prop_power + constant_survey_pwr       # [W]
-                self.S_range_t = (self.capacity/self.S_range_p)*3600    # [s]
+                # determine propulsive power needed to achieve speed v 
+                prop_power = self.get_prop_power(v)
+
+                # determine range achieved in transit and survey modes 
+                total_range_T = (self.capacity * 3600/1000 * v_total) / (constant_transit_pwr + prop_power)
+                total_range_S = (self.capacity * 3600/1000 * v_total) / (constant_survey_pwr +  prop_power)
+                prop_range_T = (self.capacity * 3600/1000 * v) / (constant_transit_pwr + prop_power)
+                prop_range_S = (self.capacity * 3600/1000 * v) / (constant_survey_pwr +  prop_power)
+
+                # append values if the ocean current c is the same as the user specified speed
+                if c == str(self.current_speed):
+                    self.T_vel_dist.append(total_range_T)
+                    self.S_vel_dist.append(total_range_S)
+
+                # check if new maximum range is achieved for transit and survey mode
+                if total_range_T > T_range:
+                    T_range = total_range_T                         # [km], maximize this term
+                    T_range_x = prop_range_T                        # [km], use this term when applying ocean currents
+                    T_range_v = v                                   # [m/s]
+                    T_range_p = prop_power + constant_transit_pwr   # [W]       
+                    T_range_t = (self.capacity/T_range_p)*3600      # [s]
+
+                if total_range_S > S_range:
+                    S_range = total_range_S                         # [km], maximize this term
+                    S_range_x = prop_range_S                        # [km], use this term when applying ocean currents
+                    S_range_v = v                                   # [m/s]
+                    S_range_p = prop_power + constant_survey_pwr    # [W]
+                    S_range_t = (self.capacity/S_range_p)*3600      # [s]  
+
+            # extract values if the ocean current c is the same as the user specified speed
+            if c == str(self.current_speed):
+                self.T_range = T_range
+                self.T_range_x = T_range_x
+                self.T_range_v = T_range_v
+                self.T_range_p = T_range_p
+                self.T_range_t = T_range_t
+                self.S_range = S_range
+                self.S_range_x = S_range_x
+                self.S_range_v = S_range_v
+                self.S_range_p = S_range_p
+                self.S_range_t = S_range_t
+
+            # append values associated with ocean-current-optimized paramters 
+            self.T_current_x.append(T_range)
+            self.S_current_x.append(S_range)
+            self.T_current_v.append(T_range_v)
+            self.S_current_v.append(S_range_v)
+            self.T_current_p.append(T_range_p)
+            self.S_current_p.append(S_range_p)
+            self.T_current_y.append(((self.T_current_v[0]+float(c))*(self.capacity/self.T_current_p[0])*3600)/1000) 
+            self.S_current_y.append(((self.S_current_v[0]+float(c))*(self.capacity/self.S_current_p[0])*3600)/1000)
+            self.T_current_i.append((self.T_current_x[-1] - self.T_current_y[-1])/ self.T_current_y[-1])
+            self.S_current_i.append((self.S_current_x[-1] - self.S_current_y[-1])/ self.S_current_y[-1])
 
         # determine range, [km], as a function of percent transit travel [%]
         for p in percent:
-            T_per_dist.append((p/100) * self.T_range)
-            S_per_dist.append((1 - (p/100)) * self.S_range)
-            total_dist.append(T_per_dist[-1] + S_per_dist[-1])
+            self.T_per_dist.append((p/100) * self.T_range)
+            self.S_per_dist.append((1 - (p/100)) * self.S_range)
+            self.total_dist.append(self.T_per_dist[-1] + self.S_per_dist[-1])
                  
-        if 'velocity-range' in self.plot_set:
-            # plot velocity vs. range
+        if 'speed-range' in self.plot_set:
+            # plot speed vs. range
             plt.figure(figsize=(10,6.5))
-            plt.title('Glider Range as Function of Velocity \n (Capacity: ' + str(self.capacity) + ' WHrs) \n (Ocean Currents: ' + str(self.current_speed) + ' m/s)', fontweight='bold')
-            plt.xlabel('Velocity [m/s]')
+            plt.title('Glider Range as Function of Speed \n (Capacity: ' + str(self.capacity) + ' WHrs) \n (Ocean Currents: ' + str(self.current_speed) + ' m/s)', fontweight='bold')
+            plt.xlabel('Speed [m/s]')
             plt.ylabel('Range [km]')
-            plt.plot(velocity, T_vel_dist, self.T_range_color, lw=self.major_line_width)
-            plt.plot(velocity, S_vel_dist, self.S_range_color, lw=self.major_line_width)
+            plt.plot(velocity, self.T_vel_dist, self.T_range_color, lw=self.major_line_width)
+            plt.plot(velocity, self.S_vel_dist, self.S_range_color, lw=self.major_line_width)
             plt.plot(velocity, [self.T_range]*len(velocity), self.T_range_color+'--', lw=self.minor_line_width)
             plt.plot(velocity, [self.S_range]*len(velocity), self.S_range_color+'--', lw=self.minor_line_width)
-            plt.legend(['low power (transit mode)', 'high power (survey mode)'])
+            plt.legend(['Low Power (Transit Mode)', 'High Power (Survey Mode)'])
             plt.grid()
             plt.show()
 
@@ -125,16 +179,107 @@ class GliderModel(object):
             plt.title('Glider Range as Function of Power Mode \n (Capacity: ' + str(self.capacity) + ' WHrs) \n (Ocean Currents: ' + str(self.current_speed) + ' m/s)', fontweight='bold')
             plt.xlabel('Percentage of Power used in transit mode [%]')
             plt.ylabel('Range [km]')
-            plt.plot(percent, total_dist, self.total_color, lw=self.major_line_width)
-            plt.plot(percent, T_per_dist, self.T_range_color+'--', lw=self.major_line_width)
-            plt.plot(percent, S_per_dist, self.S_range_color+'--', lw=self.major_line_width)
-            plt.legend(['Total Distance', 'Transit Distance', 'Survey Distance'])
+            plt.plot(percent, self.total_dist, self.total_color, lw=self.major_line_width)
+            plt.plot(percent, self.T_per_dist, self.T_range_color+'--', lw=self.major_line_width)
+            plt.plot(percent, self.S_per_dist, self.S_range_color+'--', lw=self.major_line_width)
+            plt.legend(['Total Range', 'Transit Range', 'Survey Range'])
             plt.grid()
             plt.show()
 
+        if '3d-transit-range' in self.plot_set:
+            # create a 3d-plot that shows range as a function of vehicle speed and ocean current speed
+            fig = plt.figure(figsize=(10,6.5))
+            ax = fig.add_subplot(111, projection='3d')
+            x = y = np.arange(0, 2.5, 0.1)
+            X, Y = np.meshgrid(x, y)
+            z = np.array([self.get_range(x, y, self.capacity, self.constant_transit_pwr) for x,y in zip(np.ravel(X), np.ravel(Y))])
+            Z = z.reshape(X.shape)
+            ax.plot_surface(X, Y, Z, cmap='gnuplot')
+            ax.set_title('Glider Range as Function of Vehicle Speed and Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', fontweight='bold')
+            ax.set_xlabel('Vehicle Speed [m/s]')
+            ax.set_ylabel('Ocean Current Speed [m/s]')
+            plt.show()
+
+        if '3d-survey-range' in self.plot_set:
+            # create a 3d-plot that shows range as a function of vehicle speed and ocean current speed
+            fig = plt.figure(figsize=(10,6.5))
+            ax = fig.add_subplot(111, projection='3d')
+            x = y = np.arange(0, 2.5, 0.1)
+            X, Y = np.meshgrid(x, y)
+            z = np.array([self.get_range(x, y, self.capacity, self.constant_survey_pwr) for x,y in zip(np.ravel(X), np.ravel(Y))])
+            Z = z.reshape(X.shape)
+            ax.plot_surface(X, Y, Z, cmap='gnuplot')
+            ax.set_title('Glider Range as Function of Vehicle Speed and Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', fontweight='bold')
+            ax.set_xlabel('Vehicle Speed [m/s]')
+            ax.set_ylabel('Ocean Current Speed [m/s]')
+            plt.show()
+
+        if 'current-range' in self.plot_set:
+            # plot ocean current speed vs. attainable range
+            plt.figure(figsize=(10,6.5))
+            plt.title('Glider Range as Function of Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', fontweight='bold')
+            plt.xlabel('Ocean Current Speed [m/s]')
+            plt.ylabel('Range [km]')
+            plt.plot(ocean_currents, self.T_current_x, self.T_range_color, lw=self.major_line_width)
+            plt.plot(ocean_currents, self.T_current_y, self.T_range_color+'--', lw=self.minor_line_width)
+            plt.plot(ocean_currents, self.S_current_x, self.S_range_color, lw=self.major_line_width)
+            plt.plot(ocean_currents, self.S_current_y, self.S_range_color+'--', lw=self.minor_line_width)
+            plt.legend(['Transit Range (Optimized)', 'Transit Range (Original)', 'Survey Range (Optimized)', 'Survey Range (Original)'])
+            plt.grid()
+            plt.show()
+
+        if 'current-increase' in self.plot_set:
+            # plot ocean current speed vs. percent increase value
+            plt.figure(figsize=(10,6.5))
+            plt.title('Glider Range Increase as Function of Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', fontweight='bold')
+            plt.xlabel('Ocean Current Speed [m/s]')
+            plt.ylabel('Percent [%]')
+            plt.plot(ocean_currents, self.T_current_i, self.T_range_color, lw=self.major_line_width)
+            plt.plot(ocean_currents, self.S_current_i, self.S_range_color, lw=self.major_line_width)
+            plt.legend(['Transit Mode', 'Survey Mode'])
+            plt.grid()
+            plt.show()
+
+        if 'current-speed' in self.plot_set:
+            # plot ocean current speed vs. optimal vehicle speed
+            plt.figure(figsize=(10,6.5))
+            plt.title('Glider Speed as Function of Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', fontweight='bold')
+            plt.xlabel('Ocean Current Speed [m/s]')
+            plt.ylabel('Glider Speed [m/s]')
+            plt.plot(ocean_currents, self.T_current_v, self.T_range_color, lw=self.major_line_width)
+            plt.plot(ocean_currents, self.S_current_v, self.S_range_color, lw=self.major_line_width)
+            plt.legend(['Transit Mode', 'Survey Mode'])
+            plt.grid()
+            plt.show()
+
+        if 'current-power' in self.plot_set:
+            # plot ocean current speed vs. optimal thrust value
+            plt.figure(figsize=(10,6.5))
+            plt.title('Vehcile Power as Function of Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', fontweight='bold')
+            plt.xlabel('Ocean Current Speed [m/s]')
+            plt.ylabel('Power [W]')
+            plt.plot(ocean_currents, self.T_current_p, self.T_range_color, lw=self.major_line_width)
+            plt.plot(ocean_currents, [constant_transit_pwr]*len(ocean_currents), self.T_range_color+'--', lw=self.minor_line_width)
+            plt.plot(ocean_currents, self.S_current_p, self.S_range_color, lw=self.major_line_width)
+            plt.plot(ocean_currents, [constant_survey_pwr]*len(ocean_currents), self.S_range_color+'--', lw=self.minor_line_width)
+            plt.legend(['Transit Power', 'Transit Hotel Load', 'Survey Power', 'Survey Hotel Load'])
+            plt.grid()
+            plt.show()
+
+    def get_range(self, vehicle_speed, current_speed, capacity, hotel_pwr):
+        ''' determines the range of the glider given necessary parameters
+        '''
+        v_total = vehicle_speed + current_speed
+
+        # determine propulsive power needed to achieve speed v 
+        prop_power = self.get_prop_power(vehicle_speed)
+
+        # determine range and return
+        return((capacity * 3600/1000 * v_total) / (hotel_pwr + prop_power))
+
 
     def get_prop_power(self, v):
-        ''' determines propulsive power needed to achieve v, the through-water-velocity
+        ''' determines propulsive power needed to achieve v, the through-water-speed
         '''
         return((v/self.c1)**(1/self.c2))
 
@@ -151,7 +296,7 @@ class GliderModel(object):
 
 
     def get_range_perimeter(self, lat, lon, dist):
-        ''' determines the achievable range of the glider while traveling at a range-optimizing velocity    
+        ''' determines the achievable range of the glider while traveling at a range-optimizing speed   
         '''
         # convert current lat and lon from degrees to radians
         lat1 = math.radians(lat)
@@ -320,7 +465,7 @@ if __name__ == '__main__':
     model = GliderModel()
 
     # determine model and graphing parameters 
-    model.plot_set = set(['velocity-range', 'percent-range', 'map'])
+    model.plot_set = set(['speed-range', 'percent-range', 'current-power', 'current-range', 'current-increase', 'current-speed', '3d-transit-range', '3d-survey-range', 'map'])
     constant_transit_pwr = model.constant_transit_pwr
     constant_survey_pwr =  model.constant_survey_pwr
     model.capacity = model.capacity_li_sec
@@ -331,7 +476,7 @@ if __name__ == '__main__':
     model.current_speed = 1.78              # the average speed of the gulf stream [m/s]
     model.current_dir = -40                 # chosen direction for the gulf stream current [degrees]
 
-    # extract velocity range data and plot
+    # extract speed and range data to plot
     model.get_range_data(constant_transit_pwr, constant_survey_pwr)
 
     # plot range data on world map as necessary
