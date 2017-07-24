@@ -190,7 +190,8 @@ class GliderModel(object):
             # create a 3d-plot that shows range as a function of vehicle speed and ocean current speed
             fig = plt.figure(figsize=(10,6.5))
             ax = fig.add_subplot(111, projection='3d')
-            x = y = np.arange(0, 2.5, 0.1)
+            x = np.arange(0, 2.0, 0.01)
+            y = np.arange(0, 2.5, 0.01)
             X, Y = np.meshgrid(x, y)
             z = np.array([self.get_range(x, y, self.capacity, self.constant_transit_pwr) for x,y in zip(np.ravel(X), np.ravel(Y))])
             Z = z.reshape(X.shape)
@@ -198,13 +199,15 @@ class GliderModel(object):
             ax.set_title('Glider Range as Function of Vehicle Speed and Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', fontweight='bold')
             ax.set_xlabel('Vehicle Speed [m/s]')
             ax.set_ylabel('Ocean Current Speed [m/s]')
+            ax.set_zlabel('Range [km]')
             plt.show()
 
         if '3d-survey-range' in self.plot_set:
             # create a 3d-plot that shows range as a function of vehicle speed and ocean current speed
             fig = plt.figure(figsize=(10,6.5))
             ax = fig.add_subplot(111, projection='3d')
-            x = y = np.arange(0, 2.5, 0.1)
+            x = np.arange(0, 2.0, 0.01)
+            y = np.arange(0, 2.5, 0.01)
             X, Y = np.meshgrid(x, y)
             z = np.array([self.get_range(x, y, self.capacity, self.constant_survey_pwr) for x,y in zip(np.ravel(X), np.ravel(Y))])
             Z = z.reshape(X.shape)
@@ -212,6 +215,7 @@ class GliderModel(object):
             ax.set_title('Glider Range as Function of Vehicle Speed and Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', fontweight='bold')
             ax.set_xlabel('Vehicle Speed [m/s]')
             ax.set_ylabel('Ocean Current Speed [m/s]')
+            ax.set_zlabel('Range [km]')
             plt.show()
 
         if 'current-range' in self.plot_set:
@@ -248,7 +252,8 @@ class GliderModel(object):
             plt.ylabel('Glider Speed [m/s]')
             plt.plot(ocean_currents, self.T_current_v, self.T_range_color, lw=self.major_line_width)
             plt.plot(ocean_currents, self.S_current_v, self.S_range_color, lw=self.major_line_width)
-            plt.legend(['Transit Mode', 'Survey Mode'])
+            plt.plot(ocean_currents, [self.B_range_v]*len(ocean_currents), self.total_color + '--', lw=self.major_line_width)
+            plt.legend(['Transit Mode', 'Survey Mode', 'Buoyancy Engine Speed'])
             plt.grid()
             plt.show()
 
