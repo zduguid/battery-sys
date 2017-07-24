@@ -187,9 +187,10 @@ class GUI(object):
         self.color_map = 'gist_ncar'        # used for establishing the graph colors 
 
         # battery pack information and nomenclature
+        self.ordered_pack_names = ['Pack 4', 'Pack 1', 'Pack 3', 'Pack 2']
         self.list_pack_names = ['Pack 1', 'Pack 2', 'Pack 3', 'Pack 4']
         self.dict_pack_to_nums = {'Pack 1':8, 'Pack 2':10, 'Pack 3':9, 'Pack 4':10}
-        self.dict_pack_to_name = {'Pack 1':'payload pack', 'Pack 2':'aft-long pack', 'Pack 3':'aft-short pack', 'Pack 4':'pitch pack'}
+        self.dict_pack_to_name = {'Pack 1':'Payload Pack', 'Pack 2':'Aft-Long', 'Pack 3':'Aft-Short', 'Pack 4':'Pitch Pack'}
         self.dict_code_to_pack = {'#bat1':'Pack 1', '#bat2':'Pack 2', '#bat3':'Pack 3', '#bat4':'Pack 4'}
         self.dict_pack_to_code = {'Pack 1':'#bat1', 'Pack 2':'#bat2', 'Pack 3':'#bat3', 'Pack 4':'#bat4'}
         self.dict_pack_to_bat = {}
@@ -817,10 +818,6 @@ class GUI(object):
         self.label_bat_scan = tk.Label(self.frame_main_bat, text='Scan Time:',    font=self.label_font_bold, bg=self.light_grey)
         self.label_bat_scan2 = tk.Label(self.frame_main_bat, text='(s)',           font=self.label_font, bg=self.light_grey)
         self.label_bat_relay = tk.Label(self.frame_main_bat, text='Relays On:', font=self.label_font_bold, bg=self.light_grey)
-        self.label_bat_bat1 = tk.Label(self.frame_main_bat, text='(payload)', font=self.label_font_italic, bg=self.light_grey)
-        self.label_bat_bat2 = tk.Label(self.frame_main_bat, text='(aft-long)', font=self.label_font_italic, bg=self.light_grey)
-        self.label_bat_bat3 = tk.Label(self.frame_main_bat, text='(aft-short)', font=self.label_font_italic, bg=self.light_grey)
-        self.label_bat_bat4 = tk.Label(self.frame_main_bat, text='(pitch pack)', font=self.label_font_italic, bg=self.light_grey)
         self.entry_bat_scan = tk.Entry(self.frame_main_bat, highlightbackground=self.light_grey)
         self.entry_bat_scan.insert(0, 5)
         self.dict_bat_relay_var = {} # contains check button variables 
@@ -831,10 +828,6 @@ class GUI(object):
         self.label_bat_scan.grid(row=1, column=0, sticky='e')
         self.label_bat_scan2.grid(row=1, column=12, sticky='w')
         self.label_bat_relay.grid(row=2, column=0, sticky='e')
-        self.label_bat_bat1.grid(row=3, column=15, sticky='w')
-        self.label_bat_bat2.grid(row=4, column=15, sticky='w')
-        self.label_bat_bat3.grid(row=5, column=15, sticky='w')
-        self.label_bat_bat4.grid(row=6, column=15, sticky='w')
         self.entry_bat_scan.grid(row=1, column=1, columnspan=10, sticky='nsew')
 
         # create relay check buttons, variables associated with check buttons, and labels
@@ -842,11 +835,11 @@ class GUI(object):
         for relay_index in range(max_bat_count):
             tk.Label(self.frame_main_bat, text='r'+str(relay_index+1), font=self.label_font, bg=self.light_grey).grid(row=2, column=1+relay_index)
 
-        for name_index in range(len(self.list_pack_names)):
-            tk.Label(self.frame_main_bat, text=self.list_pack_names[name_index], font=self.label_font, bg=self.light_grey).grid(row=3+name_index, column=0, sticky='e')
+        for name_index in range(len(self.ordered_pack_names)):
+            tk.Label(self.frame_main_bat, text=self.dict_pack_to_name[self.ordered_pack_names[name_index]], font=self.label_font, bg=self.light_grey).grid(row=3+name_index, column=0, sticky='e')
 
-            for relay_index in range(self.dict_pack_to_nums[self.list_pack_names[name_index]]):
-                relay_name = self.list_pack_names[name_index] + 'r' + str(relay_index+1)
+            for relay_index in range(self.dict_pack_to_nums[self.ordered_pack_names[name_index]]):
+                relay_name = self.ordered_pack_names[name_index] + 'r' + str(relay_index+1)
                 self.dict_bat_relay_var[relay_name] = tk.IntVar()
                 self.dict_bat_relay_but[relay_name] = tk.Checkbutton(self.frame_main_bat, bg=self.light_grey, variable=self.dict_bat_relay_var[relay_name], state='disabled')
                 self.dict_bat_relay_but[relay_name].grid(row=3+name_index, column=1+relay_index)
@@ -860,18 +853,18 @@ class GUI(object):
         #############################################################
         self.label_gra_title = tk.Label(self.frame_main_gra, text='Graph Options', font=self.frame_font, bg=self.light_grey)
         self.label_gra_bat_options = tk.Label(self.frame_main_gra, text='Battery Packs to Plot:', font=self.label_font_bold, bg=self.light_grey)
-        self.var_gra_b1 = tk.IntVar()
-        self.var_gra_b2 = tk.IntVar()
-        self.var_gra_b3 = tk.IntVar()
         self.var_gra_b4 = tk.IntVar()
+        self.var_gra_b1 = tk.IntVar()
+        self.var_gra_b3 = tk.IntVar()
+        self.var_gra_b2 = tk.IntVar()
+        self.checkbut_gra_b4 = tk.Checkbutton(self.frame_main_gra, bg=self.light_grey, variable=self.var_gra_b4)
         self.checkbut_gra_b1 = tk.Checkbutton(self.frame_main_gra, bg=self.light_grey, variable=self.var_gra_b1)
-        self.checkbut_gra_b2 = tk.Checkbutton(self.frame_main_gra, bg=self.light_grey, variable=self.var_gra_b2)
         self.checkbut_gra_b3 = tk.Checkbutton(self.frame_main_gra, bg=self.light_grey, variable=self.var_gra_b3)
-        self.checkbut_gra_b4 = tk.Checkbutton(self.frame_main_gra, bg=self.light_grey, variable=self.var_gra_b4)  
-        self.label_gra_bat_1 = tk.Label(self.frame_main_gra, text='Pack 1', font=self.label_font, bg=self.light_grey)
-        self.label_gra_bat_2 = tk.Label(self.frame_main_gra, text='Pack 2', font=self.label_font, bg=self.light_grey)
-        self.label_gra_bat_3 = tk.Label(self.frame_main_gra, text='Pack 3', font=self.label_font, bg=self.light_grey)
-        self.label_gra_bat_4 = tk.Label(self.frame_main_gra, text='Pack 4', font=self.label_font, bg=self.light_grey)
+        self.checkbut_gra_b2 = tk.Checkbutton(self.frame_main_gra, bg=self.light_grey, variable=self.var_gra_b2)
+        self.label_gra_bat_4 = tk.Label(self.frame_main_gra, text='Pitch Pack', font=self.label_font, bg=self.light_grey)  
+        self.label_gra_bat_1 = tk.Label(self.frame_main_gra, text='Payload', font=self.label_font, bg=self.light_grey)
+        self.label_gra_bat_3 = tk.Label(self.frame_main_gra, text='Aft-Short', font=self.label_font, bg=self.light_grey)
+        self.label_gra_bat_2 = tk.Label(self.frame_main_gra, text='Aft-Long', font=self.label_font, bg=self.light_grey)
         self.label_gra_plt_options = tk.Label(self.frame_main_gra, text='Variables to Plot:', font=self.label_font_bold, bg=self.light_grey)
         self.var_gra_v = tk.IntVar()
         self.var_gra_i = tk.IntVar()
@@ -898,14 +891,14 @@ class GUI(object):
 
         self.label_gra_title.grid(row=0, column=0, columnspan=1, sticky='nsew')
         self.label_gra_bat_options.grid(row=1, column=0, sticky='e')
-        self.checkbut_gra_b1.grid(row=1, column=1, sticky='w')
-        self.checkbut_gra_b2.grid(row=2, column=1, sticky='w')
+        self.checkbut_gra_b4.grid(row=1, column=1, sticky='w')
+        self.checkbut_gra_b1.grid(row=2, column=1, sticky='w')
         self.checkbut_gra_b3.grid(row=3, column=1, sticky='w')
-        self.checkbut_gra_b4.grid(row=4, column=1, sticky='w')
-        self.label_gra_bat_1.grid(row=1, column=2, sticky='w')
-        self.label_gra_bat_2.grid(row=2, column=2, sticky='w')
+        self.checkbut_gra_b2.grid(row=4, column=1, sticky='w')
+        self.label_gra_bat_4.grid(row=1, column=2, sticky='w')
+        self.label_gra_bat_1.grid(row=2, column=2, sticky='w')
         self.label_gra_bat_3.grid(row=3, column=2, sticky='w')
-        self.label_gra_bat_4.grid(row=4, column=2, sticky='w')
+        self.label_gra_bat_2.grid(row=4, column=2, sticky='w')
         self.label_gra_plt_options.grid(row=5, column=0, sticky='e')
         self.checkbut_gra_v.grid(row=5, column=1, sticky='w')
         self.checkbut_gra_i.grid(row=6, column=1, sticky='w')
@@ -929,20 +922,20 @@ class GUI(object):
         # TERMINAL OPTIONS CONTAINER ################################
         #############################################################
         self.label_trm_title = tk.Label(self.frame_main_trm, text='Terminal Options',  font=self.frame_font, bg=self.light_grey)
-        self.label_trm_bat_options = tk.Label(self.frame_main_trm, text='Battery Packs to Plot:', font=self.label_font_bold, bg=self.light_grey)
-        self.var_trm_b1 = tk.IntVar()
-        self.var_trm_b2 = tk.IntVar()
-        self.var_trm_b3 = tk.IntVar()
+        self.label_trm_bat_options = tk.Label(self.frame_main_trm, text='Battery Packs to Print:', font=self.label_font_bold, bg=self.light_grey)
         self.var_trm_b4 = tk.IntVar()
+        self.var_trm_b1 = tk.IntVar()
+        self.var_trm_b3 = tk.IntVar()
+        self.var_trm_b2 = tk.IntVar()
+        self.checkbut_trm_b4 = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_b4)
         self.checkbut_trm_b1 = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_b1)
-        self.checkbut_trm_b2 = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_b2)
         self.checkbut_trm_b3 = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_b3)
-        self.checkbut_trm_b4 = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_b4)  
-        self.label_trm_bat_1 = tk.Label(self.frame_main_trm, text='Pack 1', font=self.label_font, bg=self.light_grey)
-        self.label_trm_bat_2 = tk.Label(self.frame_main_trm, text='Pack 2', font=self.label_font, bg=self.light_grey)
-        self.label_trm_bat_3 = tk.Label(self.frame_main_trm, text='Pack 3', font=self.label_font, bg=self.light_grey)
-        self.label_trm_bat_4 = tk.Label(self.frame_main_trm, text='Pack 4', font=self.label_font, bg=self.light_grey)
-        self.label_trm_plt_options = tk.Label(self.frame_main_trm, text='Variables to Plot:', font=self.label_font_bold, bg=self.light_grey)
+        self.checkbut_trm_b2 = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_b2)  
+        self.label_trm_bat_4 = tk.Label(self.frame_main_trm, text='Pitch Pack', font=self.label_font, bg=self.light_grey)  
+        self.label_trm_bat_1 = tk.Label(self.frame_main_trm, text='Payload', font=self.label_font, bg=self.light_grey)
+        self.label_trm_bat_3 = tk.Label(self.frame_main_trm, text='Aft-Short', font=self.label_font, bg=self.light_grey)
+        self.label_trm_bat_2 = tk.Label(self.frame_main_trm, text='Aft-Long', font=self.label_font, bg=self.light_grey)
+        self.label_trm_plt_options = tk.Label(self.frame_main_trm, text='Variables to Print:', font=self.label_font_bold, bg=self.light_grey)
         self.var_trm_v = tk.IntVar()
         self.var_trm_i = tk.IntVar()
         self.var_trm_ai= tk.IntVar()
@@ -971,14 +964,14 @@ class GUI(object):
 
         self.label_trm_title.grid(row=0, column=0, columnspan=1, sticky='nsew')
         self.label_trm_bat_options.grid(row=1, column=0, sticky='e')
-        self.checkbut_trm_b1.grid(row=1, column=1, sticky='w')
-        self.checkbut_trm_b2.grid(row=2, column=1, sticky='w')
+        self.checkbut_trm_b4.grid(row=1, column=1, sticky='w')
+        self.checkbut_trm_b1.grid(row=2, column=1, sticky='w')
         self.checkbut_trm_b3.grid(row=3, column=1, sticky='w')
-        self.checkbut_trm_b4.grid(row=4, column=1, sticky='w')
-        self.label_trm_bat_1.grid(row=1, column=2, sticky='w')
-        self.label_trm_bat_2.grid(row=2, column=2, sticky='w')
+        self.checkbut_trm_b2.grid(row=4, column=1, sticky='w')
+        self.label_trm_bat_4.grid(row=1, column=2, sticky='w')
+        self.label_trm_bat_1.grid(row=2, column=2, sticky='w')
         self.label_trm_bat_3.grid(row=3, column=2, sticky='w')
-        self.label_trm_bat_4.grid(row=4, column=2, sticky='w')
+        self.label_trm_bat_2.grid(row=4, column=2, sticky='w')
         self.label_trm_plt_options.grid(row=5, column=0, sticky='e')
         self.checkbut_trm_v.grid(row=5, column=1, sticky='w')
         self.checkbut_trm_i.grid(row=6, column=1, sticky='w')
@@ -1003,8 +996,8 @@ class GUI(object):
         #############################################################
         # BOTTOM CONTAINER ##########################################
         #############################################################
-        self.but_bot_off = tk.Button(self.frame_main_bot, text='POWER OFF', highlightbackground=self.pwr_off_color, command=self.callback_POWER_OFF)
-        self.but_bot_close = tk.Button(self.frame_main_bot, text='close', highlightbackground=self.pwr_off_color, command=self.master.destroy)
+        self.but_bot_off = tk.Button(self.frame_main_bot, text='Recharge Off', highlightbackground=self.pwr_off_color, command=self.callback_POWER_OFF)
+        self.but_bot_close = tk.Button(self.frame_main_bot, text='Close', highlightbackground=self.pwr_off_color, command=self.master.destroy)
         self.but_bot_connect = tk.Button(self.frame_main_bot, text='Connect to Serial Bus', highlightbackground=self.connect_color, command=self.callback_connect)
 
         self.but_bot_off.grid(row=1, column=1, sticky='w')
