@@ -283,6 +283,15 @@ class GUI(object):
             load1 = self.var_pwr_l1.get()
             load2 = self.var_pwr_l2.get()
 
+            # do not allow volate/current to remain non-zero when loads are turned on
+            if (load1==1) or (load2==1):
+                desired_voltage = 0
+                desired_current = 0
+                self.entry_pwr_v.delete(0, tk.END)
+                self.entry_pwr_i.delete(0, tk.END)
+                self.entry_pwr_v.insert(0, desired_voltage)
+                self.entry_pwr_i.insert(0, desired_current)
+
             # confirm correct format of user variables
             try:
                 desired_voltage = float(desired_voltage)
@@ -307,6 +316,7 @@ class GUI(object):
                 if invalid scan command is sent
         '''
         # check serial bus connection
+        #if self.bus_connected:
         if not self.bus_connected:
             messagebox.showerror('ERROR', 'You are not connected to the Serial Bus')
 
@@ -349,6 +359,7 @@ class GUI(object):
         '''
         # check serial bus connection
         if not self.bus_connected:
+        #if self.bus_connected:
             messagebox.showerror('ERROR', 'You are not connected to the Serial Bus')
 
         # check that scan time has been specified    
@@ -472,77 +483,89 @@ class GUI(object):
             color_list = [matplotlib.colors.rgb2hex(cm(1.*i/num_colors)[:3]) for i in range(num_colors)]
             color_list_ai = [matplotlib.colors.rgb2hex(cm(1.*i/len(bat_list))[:3]) for i in range(len(bat_list))]
 
-            # enter infinite loop
-            while(True):
+            # account for when the Serial Port is no longer connected
+            try:
 
-                # pause to allow batteries to acquire new scan data
-                time.sleep(self.scan_time)
+                # enter infinite loop
+                while(True):
 
-                # interate through the batteries to be questioned
-                for bat in bat_list:
+                    # pause to allow batteries to acquire new scan data
+                    time.sleep(self.scan_time)
 
-                    # extract the current UTC time
-                    pack_data[bat]['time'].append(datetime.datetime.utcnow())
+                    # interate through the batteries to be questioned
+                    for bat in bat_list:
 
-                    # iterate through the variables to be questioned
-                    for var in var_list:
+                        # extract the current UTC time
+                        pack_data[bat]['time'].append(datetime.datetime.utcnow())
 
-                        # extract latency and bat_readings data (when aggregate current not requested)
-                        if var != '?ai':
-                            latency, bat_readings = self.bus.send_cmd(bat+var)
+                        # iterate through the variables to be questioned
+                        for var in var_list:
 
-                            # decode the bat_readings data into integer format
-                            bat_readings_int = [int(element,self.hex_base) for element in bat_readings if element!='']
+                            # extract latency and bat_readings data (when aggregate current not requested)
+                            if var != '?ai':
+                                latency, bat_readings = self.bus.send_cmd(bat+var)
 
-                            # convert temperature data from K*10 -> C as necessary
-                            if var == '?k':
-                                bat_readings_int = [reading/10 - 273.15 for reading in bat_readings_int]
+                                # decode the bat_readings data into integer format
+                                bat_readings_int = [int(element,self.hex_base) for element in bat_readings if element!='']
 
-                            # convert current data to negative values as necessary (negative indicates battery discharge) 
-                            elif var == '?i':
-                                bat_readings_int = [reading - self.current_adjust if reading > self.current_threshold else reading for reading in bat_readings_int]
+                                # convert temperature data from K*10 -> C as necessary
+                                if var == '?k':
+                                    bat_readings_int = [reading/10 - 273.15 for reading in bat_readings_int]
 
-                            # add converted bat_reading_int data to pack_data variable
-                            for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]]):
-                                pack_data[bat][var][i].append(bat_readings_int[i])
+                                # convert current data to negative values as necessary (negative indicates battery discharge) 
+                                elif var == '?i':
+                                    bat_readings_int = [reading - self.current_adjust if reading > self.current_threshold else reading for reading in bat_readings_int]
 
-                        # if aggregate current is requested, sum over the current readings of the individual batteries, then add to pack_data
-                        else:
-                            pack_data[bat][var].append(sum([pack_data[bat]['?i'][bat_num][-1] for bat_num in range(len(pack_data[bat]['?i']))]))
+                                # add converted bat_reading_int data to pack_data variable
+                                for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]]):
+                                    pack_data[bat][var][i].append(bat_readings_int[i])
 
-                # plotting process for when one variable is selected
-                if len(var_list) == 1:
-                    for i in range(len(legend_list)):
+                            # if aggregate current is requested, sum over the current readings of the individual batteries, then add to pack_data
+                            else:
+                                pack_data[bat][var].append(sum([pack_data[bat]['?i'][bat_num][-1] for bat_num in range(len(pack_data[bat]['?i']))]))
 
-                        # identify the current battery
-                        cur_bat = legend_list[i]
-                        ax.plot(pack_data[self.dict_bat_to_code[cur_bat]]['time'], 
-                                pack_data[self.dict_bat_to_code[cur_bat]][var_list[0]][self.dict_bat_to_packindex[cur_bat]],
-                                color_list[i])
+                    # plotting process for when one variable is selected
+                    if len(var_list) == 1:
+                        for i in range(len(legend_list)):
 
-                # plotting process for when more than one variable is selected
-                else:
-                    for v in range(len(var_list)):
+                            # identify the current battery
+                            cur_bat = legend_list[i]
+                            ax.plot(pack_data[self.dict_bat_to_code[cur_bat]]['time'], 
+                                    pack_data[self.dict_bat_to_code[cur_bat]][var_list[0]][self.dict_bat_to_packindex[cur_bat]],
+                                    color_list[i])
 
-                        # plotting behavior for non-aggregate-current variables
-                        if var_list[v] != '?ai':
-                            for i in range(len(legend_list)):
+                    # plotting process for when more than one variable is selected
+                    else:
+                        for v in range(len(var_list)):
 
-                                # identify the current battery
-                                cur_bat = legend_list[i]
-                                ax[v].plot(pack_data[self.dict_bat_to_code[cur_bat]]['time'], 
-                                           pack_data[self.dict_bat_to_code[cur_bat]][var_list[v]][self.dict_bat_to_packindex[cur_bat]],
-                                           color_list[i])
+                            # plotting behavior for non-aggregate-current variables
+                            if var_list[v] != '?ai':
+                                for i in range(len(legend_list)):
 
-                        # plotting behavior for aggregate current behavior
-                        else:
-                            for i in range(len(bat_list)):
-                                ax[v].plot(pack_data[bat_list[i]]['time'],
-                                           pack_data[bat_list[i]]['?ai'],
-                                           color_list_ai[i])
+                                    # identify the current battery
+                                    cur_bat = legend_list[i]
+                                    ax[v].plot(pack_data[self.dict_bat_to_code[cur_bat]]['time'], 
+                                               pack_data[self.dict_bat_to_code[cur_bat]][var_list[v]][self.dict_bat_to_packindex[cur_bat]],
+                                               color_list[i])
 
-                # pause plot in order for new data to update
-                plt.pause(self.bus.wait_time)
+                            # plotting behavior for aggregate current behavior
+                            else:
+                                for i in range(len(bat_list)):
+                                    ax[v].plot(pack_data[bat_list[i]]['time'],
+                                               pack_data[bat_list[i]]['?ai'],
+                                               color_list_ai[i])
+
+                    try:
+                        # pause plot in order for new data to update
+                        plt.pause(self.bus.wait_time)
+                    except tk.TclError:
+                        print('>> Graph closed')
+                        break
+
+            # Serial Port is no longer connected
+            except serial.serialutil.SerialException:
+                print('>> Lost connection to Serial Bus')
+                self.bus_connected = False 
 
 
     def callback_trm_ex(self):
@@ -648,54 +671,62 @@ class GUI(object):
                     else:
                         pack_data[bat][var] = [[] for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]])]
 
-            # enter infinite loop
-            while(True):
+            # account for when the Serial Port is no longer connected
+            try:
 
-                # pause to allow batteries to acquire new scan data
-                time.sleep(self.scan_time)
+                # enter infinite loop
+                while(True):
 
-                print('\n')
-                # display the current UTC time
-                print('- Time: '+ str(datetime.datetime.utcnow()))
+                    # pause to allow batteries to acquire new scan data
+                    time.sleep(self.scan_time)
 
-                # interate through the batteries to be questioned
-                for bat in bat_list:
+                    print('\n')
+                    # display the current UTC time
+                    print('- Time: '+ str(datetime.datetime.utcnow()))
 
-                    # extract the current UTC time
-                    pack_data[bat]['time'].append(datetime.datetime.utcnow())
+                    # interate through the batteries to be questioned
+                    for bat in bat_list:
 
-                    # iterate through the variables to be questioned
-                    for var in var_list:
+                        # extract the current UTC time
+                        pack_data[bat]['time'].append(datetime.datetime.utcnow())
 
-                        # extract latency and bat_readings data (when aggregate current not requested)
-                        if var != '?ai':
-                            latency, bat_readings = self.bus.send_cmd(bat+var)
+                        # iterate through the variables to be questioned
+                        for var in var_list:
 
-                            # decode the bat_readings data into integer format
-                            bat_readings_int = [int(element,self.hex_base) for element in bat_readings if element!='']
+                            # extract latency and bat_readings data (when aggregate current not requested)
+                            if var != '?ai':
+                                latency, bat_readings = self.bus.send_cmd(bat+var)
 
-                            # convert temperature data from K*10 -> C as necessary
-                            if var == '?k':
-                                bat_readings_int = [int(reading/10 - 273.15) for reading in bat_readings_int]
+                                # decode the bat_readings data into integer format
+                                bat_readings_int = [int(element,self.hex_base) for element in bat_readings if element!='']
 
-                            # convert current data to negative values as necessary (negative indicates battery discharge) 
-                            elif var == '?i':
-                                bat_readings_int = [reading - self.current_adjust if reading > self.current_threshold else reading for reading in bat_readings_int]
+                                # convert temperature data from K*10 -> C as necessary
+                                if var == '?k':
+                                    bat_readings_int = [int(reading/10 - 273.15) for reading in bat_readings_int]
 
-                            # add converted bat_reading_int data to pack_data variable
-                            for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]]):
-                                pack_data[bat][var][i].append(bat_readings_int[i])
+                                # convert current data to negative values as necessary (negative indicates battery discharge) 
+                                elif var == '?i':
+                                    bat_readings_int = [reading - self.current_adjust if reading > self.current_threshold else reading for reading in bat_readings_int]
 
-                            # print relevant data 
-                            print('-', self.dict_code_to_pack[bat], self.dict_axis_info[var], [bat_readings_int[i] for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]])])
+                                # add converted bat_reading_int data to pack_data variable
+                                for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]]):
+                                    pack_data[bat][var][i].append(bat_readings_int[i])
 
-                        # if aggregate current is requested, sum over the current readings of the individual batteries, then add to pack_data
-                        else:
-                            pack_data[bat][var].append(sum([pack_data[bat]['?i'][bat_num][-1] for bat_num in range(len(pack_data[bat]['?i']))]))
-                            print('-', self.dict_code_to_pack[bat], self.dict_axis_info[var], pack_data[bat][var][-1])
+                                # print relevant data 
+                                print('-', self.dict_code_to_pack[bat], self.dict_axis_info[var], [bat_readings_int[i] for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]])])
+
+                            # if aggregate current is requested, sum over the current readings of the individual batteries, then add to pack_data
+                            else:
+                                pack_data[bat][var].append(sum([pack_data[bat]['?i'][bat_num][-1] for bat_num in range(len(pack_data[bat]['?i']))]))
+                                print('-', self.dict_code_to_pack[bat], self.dict_axis_info[var], pack_data[bat][var][-1])
+
+            # Serial Port is no longer connected
+            except serial.serialutil.SerialException:
+                print('>> Lost connection to Serial Bus')
+                self.bus_connected = False 
 
 
-    def callback_POWER_OFF(self):
+    def callback_recharge_off(self):
         ''' commands power supply to zero voltage, zero current, and both loads off
             :raises error message:
                 if there is not a connection with the serial bus
@@ -794,7 +825,7 @@ class GUI(object):
         self.var_pwr_l2 = tk.IntVar()
         self.checkbut_pwr_l1 = tk.Checkbutton(self.frame_main_pwr, bg=self.light_grey, variable=self.var_pwr_l1)
         self.checkbut_pwr_l2 = tk.Checkbutton(self.frame_main_pwr, bg=self.light_grey, variable=self.var_pwr_l2)
-        self.but_pwr_ex = tk.Button(self.frame_main_pwr, text="EXECUTE", highlightbackground=self.light_grey, command=self.callback_pwr_ex)
+        self.but_pwr_ex = tk.Button(self.frame_main_pwr, text='Execute', highlightbackground=self.light_grey, command=self.callback_pwr_ex)
 
         self.label_pwr_title.grid(row=0, columnspan=1, column=0, sticky='nsew')
         self.label_pwr_v.grid(row=1, column=0, sticky='e')
@@ -822,7 +853,7 @@ class GUI(object):
         self.entry_bat_scan.insert(0, 5)
         self.dict_bat_relay_var = {} # contains check button variables 
         self.dict_bat_relay_but = {} # contains check button objects
-        self.but_bat_ex =tk.Button(self.frame_main_bat, text="EXECUTE", highlightbackground=self.light_grey, command=self.callback_bat_ex)
+        self.but_bat_ex =tk.Button(self.frame_main_bat, text='Execute', highlightbackground=self.light_grey, command=self.callback_bat_ex)
 
         self.label_bat_title.grid(row=0, column=0, columnspan=1, sticky='nsew')
         self.label_bat_scan.grid(row=1, column=0, sticky='e')
@@ -831,6 +862,7 @@ class GUI(object):
         self.entry_bat_scan.grid(row=1, column=1, columnspan=10, sticky='nsew')
 
         # create relay check buttons, variables associated with check buttons, and labels
+        # FIXME relay button functionality is not implemented yet 
         max_bat_count = max(self.dict_pack_to_nums.values())
         for relay_index in range(max_bat_count):
             tk.Label(self.frame_main_bat, text='r'+str(relay_index+1), font=self.label_font, bg=self.light_grey).grid(row=2, column=1+relay_index)
@@ -887,7 +919,7 @@ class GUI(object):
         self.label_gra_k = tk.Label(self.frame_main_gra, text='Temperature (C)', font=self.label_font, bg=self.light_grey)
         self.label_gra_q = tk.Label(self.frame_main_gra, text='Charge State (mAhrs)', font=self.label_font, bg=self.light_grey)
         self.label_gra_c = tk.Label(self.frame_main_gra, text='Desired Charge Rate (mA)', font=self.label_font, bg=self.light_grey)
-        self.but_gra_ex = tk.Button(self.frame_main_gra, text='EXECUTE', highlightbackground=self.light_grey, command=self.callback_gra_ex)
+        self.but_gra_ex = tk.Button(self.frame_main_gra, text='Execute', highlightbackground=self.light_grey, command=self.callback_gra_ex)
 
         self.label_gra_title.grid(row=0, column=0, columnspan=1, sticky='nsew')
         self.label_gra_bat_options.grid(row=1, column=0, sticky='e')
@@ -921,6 +953,7 @@ class GUI(object):
         #############################################################
         # TERMINAL OPTIONS CONTAINER ################################
         #############################################################
+        # FIXME IEB status flag button functionality is not implemented yet 
         self.label_trm_title = tk.Label(self.frame_main_trm, text='Terminal Options',  font=self.frame_font, bg=self.light_grey)
         self.label_trm_bat_options = tk.Label(self.frame_main_trm, text='Battery Packs to Print:', font=self.label_font_bold, bg=self.light_grey)
         self.var_trm_b4 = tk.IntVar()
@@ -951,7 +984,7 @@ class GUI(object):
         self.checkbut_trm_k = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_k)
         self.checkbut_trm_q = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_q)
         self.checkbut_trm_c = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_c)
-        self.checkbut_trm_f = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_f)
+        self.checkbut_trm_f = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_f, state='disabled')
         self.label_trm_v = tk.Label(self.frame_main_trm, text='Voltage (mV)', font=self.label_font, bg=self.light_grey)
         self.label_trm_i = tk.Label(self.frame_main_trm, text='Current (mA)', font=self.label_font, bg=self.light_grey)
         self.label_trm_ai= tk.Label(self.frame_main_trm, text='Aggregate Current (mA)', font=self.label_font, bg=self.light_grey)
@@ -960,7 +993,7 @@ class GUI(object):
         self.label_trm_q = tk.Label(self.frame_main_trm, text='Charge State (mAhrs)', font=self.label_font, bg=self.light_grey)
         self.label_trm_c = tk.Label(self.frame_main_trm, text='Desired Charge Rate (mA)', font=self.label_font, bg=self.light_grey)
         self.label_trm_f = tk.Label(self.frame_main_trm, text='IEB Status Flags', font=self.label_font, bg=self.light_grey)
-        self.but_trm_ex = tk.Button(self.frame_main_trm, text='EXECUTE', highlightbackground=self.light_grey, command=self.callback_trm_ex)
+        self.but_trm_ex = tk.Button(self.frame_main_trm, text='Execute', highlightbackground=self.light_grey, command=self.callback_trm_ex)
 
         self.label_trm_title.grid(row=0, column=0, columnspan=1, sticky='nsew')
         self.label_trm_bat_options.grid(row=1, column=0, sticky='e')
@@ -996,7 +1029,7 @@ class GUI(object):
         #############################################################
         # BOTTOM CONTAINER ##########################################
         #############################################################
-        self.but_bot_off = tk.Button(self.frame_main_bot, text='Recharge Off', highlightbackground=self.pwr_off_color, command=self.callback_POWER_OFF)
+        self.but_bot_off = tk.Button(self.frame_main_bot, text='Recharge Off', highlightbackground=self.pwr_off_color, command=self.callback_recharge_off)
         self.but_bot_close = tk.Button(self.frame_main_bot, text='Close', highlightbackground=self.pwr_off_color, command=self.master.destroy)
         self.but_bot_connect = tk.Button(self.frame_main_bot, text='Connect to Serial Bus', highlightbackground=self.connect_color, command=self.callback_connect)
 
