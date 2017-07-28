@@ -1,5 +1,5 @@
 
-<img src="images/glider2.png" alt="glider_image" align="right" height="100" />
+<img src="images/glider2.png" alt="glider_image" align="right" height="70" />
 
 # Slocum Glider Battery System  
  
