@@ -1,5 +1,5 @@
 <a href="https://github.com/zduguid">
-    <img src="images/glider2.png" alt="glider_image" align="right" height="60" />
+    <img src="images/glider2.png" alt="glider_image" align="right" height="70" />
 </a>
 
 
