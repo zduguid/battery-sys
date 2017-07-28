@@ -1,5 +1,5 @@
 
-<img src="glider.png" alt="glider_image" align="right" height="100" />
+<img src="images/glider2.png" alt="glider_image" align="right" height="100" />
 
 # Slocum Glider Battery System  
  
@@ -43,6 +43,4 @@ Give examples
 
 ## Acknowledgments
 
-* Hat tip to anyone who's code was used
 * Inspiration
-* etc

@@ -443,7 +443,7 @@ class GliderModel(object):
         # draw basemap and glider image
         fig = plt.figure(figsize=(6.5,6.5))
         ax = fig.add_subplot(111)
-        glider_im = plt.imread('glider.png')
+        glider_im = plt.imread('images/glider1.png')
         bmap = Basemap(projection='lcc', width=self.map_width, height=self.map_width, lat_0=self.lat, lon_0=self.lon, resolution='c', ax=ax)
         bmap.fillcontinents(color=self.base_land, lake_color=self.base_water)
         bmap.imshow(glider_im, interpolation='lanczos', origin='upper', zorder=10)
