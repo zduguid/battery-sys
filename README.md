@@ -1,5 +1,6 @@
-
-<img src="images/glider2.png" alt="glider_image" align="right" height="100" />
+<a href="https://github.com/zduguid">
+    <img src="images/glider2.png" alt="glider_image" align="right" height="80" />
+</a>
 
 # Slocum Glider Battery System  
  
