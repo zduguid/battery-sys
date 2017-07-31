@@ -42,11 +42,11 @@ The Battery GUI can be operated from any computer given that the appropriate dep
 
 ### Slocum Glider Overview
 
-<img src="images/glider_diagram.png" alt="glider_diagram" align="center" height="100">
+<img src="images/glider_diagram.png" alt="glider_diagram" align="center" width="600">
 
 There are four distinct battery packs on the glider: pitch pack, payload pack, aft-short pack, and aft-long pack. Communication with the battery packs occurs via a SAIL bus, which uses the SAIL interface. Using the SAIL interface, the pitch pack is addressed using ```#bat4```, the payload pack is addressed using ```#bat1```, the aft-short pack is addressed using ```#bat3```, and the aft-long pack is addressed using ```#bat2```. In our test configuration, the power supply is addressed using ```#ada```. This addresses are utilized in the ```battery_gui``` script in order to communicate with the desired battery pack or power supply. The full test configuration can be seen in the diagram below. 
 
-<img src="images/block_diagram.png" alt="block_diagram" align="center" height="100">
+<img src="images/block_diagram.jpg" alt="block_diagram" align="center" width="700">
 
 
 ### Other Helpful Commands and Links 
@@ -57,15 +57,15 @@ There are four distinct battery packs on the glider: pitch pack, payload pack, a
 
 * ```python -m serial.tools.list_ports```
 
-    *This command lists the available serial ports on your computer
+    * This command lists the available serial ports on your computer
 
 * ```python3 -m pip install matplotlib -v```
 
-    *This command is an example of how to download a module (in this case, ```matplotlib```) using ```Python3```
+    * This command is an example of how to download a module (in this case, ```matplotlib```) using ```Python3```
 
 * ```2017-04-10-raspbian-jessie.img```
 
-    *This is the operating system that I have installed on the Raspberry Pi 2
+    * This is the operating system that I have installed on the Raspberry Pi 2
 
 * ```cat /etc/os-release```
 
@@ -86,7 +86,7 @@ There are four distinct battery packs on the glider: pitch pack, payload pack, a
 
 The Battery System GUI allows for interaction between your computer and the battery pack system of the Slocum Glider via the SAIL interface. The following image displays the default GUI window when the ```battery_gui.py``` script is executed: 
 
-<img src="images/GUI_example.png" alt="GUI_example" align="center" height="100">
+<img src="images/GUI_example.png" alt="GUI_example" align="center" width="800">
 
 Each frame within the main GUI window provides distinct options for the user. Once the user selects their desired input within each frame, they must then select the Execute button within the same frame in order to the command to be sent to the SAIL bus. Below the four main frames, the user has access to three buttons. The Recharge Off button will immediately set the Power Supply current and voltage to zero, the Close button will terminate the GUI window, and the Connect to Serial Bus button will establish a connection with the serial port provided that their is a serial port available. 
 
@@ -122,45 +122,43 @@ In order to calculate the achievable range, the model utilizes the power-speed r
 
 The user has the ability to toggle on and off the following plots by adding their plot name to the ``` model.plot_set``` object: 
 
-* ```’speed-range’```
+* ```"speed-range"```
 
-<img src="images/speed_range1.png" alt="speed_range1" align="center" height="100">
-<img src="images/speed_range2.png" alt="speed_range2" align="center" height="100">
-
-
-* ```’percent-range’```
-
-<img src="images/percent_range.png" alt="percent_range" align="center" height="100">
+<img src="images/speed_range1.png" alt="speed_range1" align="center" width="900">
+<img src="images/speed_range2.png" alt="speed_range2" align="center" width="1000">
 
 
-* ```’3d-transit-range’```
+* ```"3d-transit-range"```
 
-<img src="images/speed_current_range1.png" alt="speed_current_range1" align="center" height="100">
-
-
-* ```’3d-survey-range'```
-
-<img src="images/speed_current_range2.png" alt="speed_current_range2" align="center" height="100">
+<img src="images/speed_current_range1.png" alt="speed_current_range1" align="center" width="1100">
 
 
-* ```’current-range'```
+* ```"3d-survey-range"```
 
-<img src="images/current_range.png" alt="current_range" align="center" height="100">
+<img src="images/speed_current_range2.png" alt="speed_current_range2" align="center" width="1200">
 
 
-* ```’current-increase'```
+* ```"current-range"```
+
+<img src="images/current_range.png" alt="current_range" align="center" width="1300">
+
+
+* ```"current-increase"```
 
 <img src="images/current_percent.png" alt="current_percent" align="center" height="100">
 
 
-* ```’current-speed'```
+* ```"current-speed"```
 
 <img src="images/current_speed.png" alt="current_speed" align="center" height="100">
 
 
-* ```’current-power'```
+* ```"current-power"```
 
 <img src="images/current_power.png" alt="current_power" align="center" height="100">
+
+* ```"map"```
+
 
 
 
