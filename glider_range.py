@@ -518,7 +518,7 @@ if __name__ == '__main__':
     model.lon = -77.25                      # lon of the Bahamas
     model.map_width = 8e6                   # desired width of the world map
     model.buoyancy_on = False               # determine whether or not to plot buoyancy transit mode range limits 
-    model.current_speed = 1.78               # the average speed of the gulf stream [m/s]
+    model.current_speed = 1.78              # the average speed of the gulf stream [m/s]
     model.current_dir = -40                 # chosen direction for the gulf stream current [degrees]
 
     # extract speed and range data to plot
