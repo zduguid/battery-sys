@@ -63,7 +63,7 @@ There are four distinct battery packs on the glider: the pitch pack, the payload
 
     * This command is an example of how to download a module (in this case, ```matplotlib```) using ```Python3```
 
-* ```code2pdf -l -s a3 -S emacs <INPUT-FILE> <OUTPUT-FILE>
+* ```code2pdf -l -s a3 -S emacs <INPUT-FILE> <OUTPUT-FILE>```
 
     * This command creates a pdf version of the input file by using the ```code2pdf``` module
 
