@@ -178,7 +178,7 @@ The user has the ability to toggle on and off the following plots by adding thei
 * **Zach Duguid** - [zacharysupertramp](https://github.com/zduguid)
 
 ## Acknowledgements
-* Woods Hole Oceanagraphic Institution (WHOI)
+* Woods Hole Oceanographic Institution (WHOI)
 * National Science Foundation (NSF)
 * Deep Submergence Laboratory, WHOI
 * Project Supervisor: Rich Camilli
