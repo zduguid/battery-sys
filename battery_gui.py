@@ -5,7 +5,7 @@
 # - Allows for charging and discharging control of the battery pack
 # 
 # Author: Zach Duguid
-# Last Updated: 07/13/2017
+# Last Updated: 01/17/2018
 
 
 import serial
@@ -93,7 +93,7 @@ class PowerSupply(object):
         self.i_gain = i_gain            # current gain of the power supply
         self.i_offset = i_offset        # current offset of the power supply
         self.max_voltage = 16           # conservative value for now
-        self.max_current = 1            # conservative value for now
+        self.max_current = 4            # conservative value for now
         self.voltage_channel = '!a1.'   # name of voltage channel
         self.current_channel = '!a2.'   # name of current channel
         self.execute_str = 'x'          # syntax for the termination of a command
@@ -107,16 +107,14 @@ class PowerSupply(object):
     def set_voltage(self, target_voltage, bus):
         ''' command power supply to target voltage, subject to maximum voltage limitation
         '''
-        if target_voltage <= self.max_voltage:
-            input_val = int((target_voltage - self.v_offset)/self.v_gain)
-        else:
-            input_val = int((self.max_voltage - self.v_offset)/self.v_gain)
+        # determine input command
+        input_val = int((target_voltage - self.v_offset)/self.v_gain)
 
         # convert interger command to hex command 
         input_cmd = '{0:x}'.format(input_val)
 
         # convert to a positive hex command if command is input_cmd is negative
-        if int(input_cmd) < 0: 
+        if int(input_cmd, 16) < 0: 
             input_cmd = '{0:x}'.format(int('ffffffff', self.hex_base) + int(input_cmd) +1)
 
         # send voltage command to the power supply via the serial bus
@@ -126,17 +124,17 @@ class PowerSupply(object):
     def set_current(self, target_current, bus):
         ''' command power supply to target current, subject to maximum current limitation
         '''
-        if target_current <= self.max_current:
-            input_val = int((target_current - self.i_offset)/self.i_gain)
-        else:
-            input_val = int((self.max_current - self.i_offset)/self.i_gain)
+        # determine input command
+        input_val = int((target_current - self.i_offset)/self.i_gain)
 
         # convert interger command to hex command 
         input_cmd = '{0:x}'.format(input_val)
 
         # convert to a positive hex command if command is input_cmd is negative
-        if int(input_cmd) < 0: 
-            input_cmd = '{0:x}'.format(int('ffffffff', self.hex_base) + int(input_cmd) +1)
+        if int(input_cmd, 16) < 0: 
+            input_cmd = '{0:x}'.format(int('ffffffff', self.hex_base) + int(input_cmd) + 1)
+
+        print(input_cmd)
 
         # send current command to the power supply via the serial bus
         bus.send_cmd(self.name + self.current_channel + str(input_cmd) + self.execute_str)
@@ -204,6 +202,8 @@ class GUI(object):
                 self.dict_pack_to_bat[name].append('B'+str(self.total_bat_count))
                 self.dict_bat_to_code['B'+str(self.total_bat_count)] = self.dict_pack_to_code[name]
                 self.dict_bat_to_packindex['B'+str(self.total_bat_count)] = i-1
+
+        self.execute_str = 'x'          # syntax for the termination of a command
 
         self.dict_axis_info = {'?v'   : 'Voltage (mV)',
                                '?i'   : 'Current (mA)',
@@ -282,6 +282,10 @@ class GUI(object):
             load1 = self.var_pwr_l1.get()
             load2 = self.var_pwr_l2.get()
 
+            # notify the user if a high voltage or high current is selected
+            if (desired_voltage > self.pwr_supply.max_voltage) or (desired_current > self.pwr_supply.max_current):
+                messagebox.showerror('WARNING', 'High voltage or high current detected. Proceed with caution')
+
             # do not allow volate/current to remain non-zero when loads are turned on
             if (load1==1) or (load2==1):
                 desired_voltage = 0
@@ -315,7 +319,6 @@ class GUI(object):
                 if invalid scan command is sent
         '''
         # check serial bus connection
-        #if self.bus_connected:
         if not self.bus_connected:
             messagebox.showerror('ERROR', 'You are not connected to the Serial Bus')
 
@@ -346,8 +349,45 @@ class GUI(object):
             except ValueError:
                 messagebox.showerror('ERROR', 'Invalid Scan Time Command, please insert a valid number')
                 self.entry_bat_scan.delete(0, tk.END)
- 
 
+            # number of relay bits that must be specified in order for batteries to respond
+            # '1' signifies ON and 0' signifies OFF 
+            max_num_relays = 10
+            mid_num_relays = 5
+
+            # string used to initialize a change in the relay settings
+            init_relay_cmd = '!rb'
+
+            # derive a new relay send command for each battery pack
+            for pack_name in self.ordered_pack_names:
+
+                # initialize relay send command with the battery code and initialize command
+                bat_code = self.dict_pack_to_code[pack_name]
+                relay_cmd = bat_code + init_relay_cmd
+
+                # iterate through the GUI checkbox variables and update the relay command
+                for relay_num in range(1, max_num_relays + 1):
+
+                    # if the relay exists for this battery, extract the true value
+                    if relay_num <= self.dict_pack_to_nums[pack_name]:
+                        relay_name = bat_code + 'r' + str(relay_num)
+                        relay_cmd += str(self.dict_bat_relay_var[relay_name].get())
+
+                    # if the relay does not exist for this battery, represent the extra bit(s) with 0
+                    else:
+                        relay_cmd += '0'
+
+                    # add a comma at the midpoint of the 10 its in order to promote human readability
+                    if relay_num == mid_num_relays:
+                        relay_cmd += ','
+
+                # finalize the relay send command by adding the execute string
+                relay_cmd += self.execute_str
+
+                # send the relay send command via the bus
+                self.bus.send_cmd(relay_cmd)
+
+ 
     def callback_gra_ex(self):
         ''' execute graph creation dependent on user inputs
             :raises error message:
@@ -358,7 +398,6 @@ class GUI(object):
         '''
         # check serial bus connection
         if not self.bus_connected:
-        #if self.bus_connected:
             messagebox.showerror('ERROR', 'You are not connected to the Serial Bus')
 
         # check that scan time has been specified    
@@ -369,7 +408,7 @@ class GUI(object):
         elif ((self.var_gra_b1.get() + 
                self.var_gra_b2.get() + 
                self.var_gra_b3.get() + 
-               self.var_gra_b4.get()) ==0):
+               self.var_gra_b4.get()) == 0):
             messagebox.showerror('ERROR', 'Please select one or more batteries to graph')
 
         # check that variables to plot have been specified
@@ -725,6 +764,78 @@ class GUI(object):
                 self.bus_connected = False 
 
 
+    def callback_select_all_pitch(self):
+        ''' allows user to select all battery relays for the pitch pack at once 
+        '''
+        # find the relevant relay variables for the pitch pack
+        relay_vars = [relay for relay in self.dict_bat_relay_var.keys() if relay[:5] == '#bat4']
+
+        # determine if all of the batteries are currently selected
+        if sum([self.dict_bat_relay_var[relay].get() for relay in relay_vars]) < len(relay_vars):
+
+            # select all the checkboxes
+            for relay in relay_vars:
+                self.dict_bat_relay_var[relay].set(1)
+        else:
+            # deselect all the checkboxes
+            for relay in relay_vars:
+                self.dict_bat_relay_var[relay].set(0)
+
+
+    def callback_select_all_payload(self):
+        ''' allows user to select all battery relays for the payload pack at once 
+        '''
+        # find the relevant relay variables for the payload pack
+        relay_vars = [relay for relay in self.dict_bat_relay_var.keys() if relay[:5] == '#bat1']
+
+        # determine if all of the batteries are currently selected
+        if sum([self.dict_bat_relay_var[relay].get() for relay in relay_vars]) < len(relay_vars):
+
+            # select all the checkboxes
+            for relay in relay_vars:
+                self.dict_bat_relay_var[relay].set(1)
+        else:
+            # deselect all the checkboxes
+            for relay in relay_vars:
+                self.dict_bat_relay_var[relay].set(0)
+
+
+    def callback_select_all_aftshort(self):
+        ''' allows user to select all battery relays for the aftshort pack at once 
+        '''
+        # find the relevant relay variables for the aftshort pack
+        relay_vars = [relay for relay in self.dict_bat_relay_var.keys() if relay[:5] == '#bat3']
+
+        # determine if all of the batteries are currently selected
+        if sum([self.dict_bat_relay_var[relay].get() for relay in relay_vars]) < len(relay_vars):
+
+            # select all the checkboxes
+            for relay in relay_vars:
+                self.dict_bat_relay_var[relay].set(1)
+        else:
+            # deselect all the checkboxes
+            for relay in relay_vars:
+                self.dict_bat_relay_var[relay].set(0)
+
+
+    def callback_select_all_aftlong(self):
+        ''' allows user to select all battery relays for the aftlong pack at once 
+        '''
+        # find the relevant relay variables for the aftlong pack
+        relay_vars = [relay for relay in self.dict_bat_relay_var.keys() if relay[:5] == '#bat2']
+
+        # determine if all of the batteries are currently selected
+        if sum([self.dict_bat_relay_var[relay].get() for relay in relay_vars]) < len(relay_vars):
+
+            # select all the checkboxes
+            for relay in relay_vars:
+                self.dict_bat_relay_var[relay].set(1)
+        else:
+            # deselect all the checkboxes
+            for relay in relay_vars:
+                self.dict_bat_relay_var[relay].set(0)
+
+
     def callback_recharge_off(self):
         ''' commands power supply to zero voltage, zero current, and both loads off
             :raises error message:
@@ -785,7 +896,7 @@ class GUI(object):
         # no serial port is available 
         else:
             self.bus_connected = False
-            messagebox.showerror("ERROR", "Serial Bus not available")
+            messagebox.showerror('ERROR', 'Serial Bus not available')
 
 
     def init_frame_containers(self):
@@ -852,16 +963,24 @@ class GUI(object):
         self.entry_bat_scan.insert(0, 5)
         self.dict_bat_relay_var = {} # contains check button variables 
         self.dict_bat_relay_but = {} # contains check button objects
-        self.but_bat_ex =tk.Button(self.frame_main_bat, text='Execute', highlightbackground=self.light_grey, command=self.callback_bat_ex)
+        self.dict_bat_relay_all = {} # contains button objects
+        self.but_bat_pitch = tk.Button(self.frame_main_bat, text='select all', highlightbackground=self.light_grey, command=self.callback_select_all_pitch)
+        self.but_bat_payload = tk.Button(self.frame_main_bat, text='select all', highlightbackground=self.light_grey, command=self.callback_select_all_payload)
+        self.but_bat_aftshort = tk.Button(self.frame_main_bat, text='select all', highlightbackground=self.light_grey, command=self.callback_select_all_aftshort)
+        self.but_bat_aftlong = tk.Button(self.frame_main_bat, text='select all', highlightbackground=self.light_grey, command=self.callback_select_all_aftlong)
+        self.but_bat_ex = tk.Button(self.frame_main_bat, text='Execute', highlightbackground=self.light_grey, command=self.callback_bat_ex)
 
         self.label_bat_title.grid(row=0, column=0, columnspan=1, sticky='nsew')
         self.label_bat_scan.grid(row=1, column=0, sticky='e')
         self.label_bat_scan2.grid(row=1, column=12, sticky='w')
         self.label_bat_relay.grid(row=2, column=0, sticky='e')
         self.entry_bat_scan.grid(row=1, column=1, columnspan=10, sticky='nsew')
+        self.but_bat_pitch.grid(row=3, column=15, sticky='e')
+        self.but_bat_payload.grid(row=4, column=15, sticky='e')
+        self.but_bat_aftshort.grid(row=5, column=15, sticky='e')
+        self.but_bat_aftlong.grid(row=6, column=15, sticky='e')
 
         # create relay check buttons, variables associated with check buttons, and labels
-        # FIXME relay button functionality is not implemented yet 
         max_bat_count = max(self.dict_pack_to_nums.values())
         for relay_index in range(max_bat_count):
             tk.Label(self.frame_main_bat, text='r'+str(relay_index+1), font=self.label_font, bg=self.light_grey).grid(row=2, column=1+relay_index)
@@ -869,10 +988,11 @@ class GUI(object):
         for name_index in range(len(self.ordered_pack_names)):
             tk.Label(self.frame_main_bat, text=self.dict_pack_to_name[self.ordered_pack_names[name_index]], font=self.label_font, bg=self.light_grey).grid(row=3+name_index, column=0, sticky='e')
 
+
             for relay_index in range(self.dict_pack_to_nums[self.ordered_pack_names[name_index]]):
-                relay_name = self.ordered_pack_names[name_index] + 'r' + str(relay_index+1)
-                self.dict_bat_relay_var[relay_name] = tk.IntVar()
-                self.dict_bat_relay_but[relay_name] = tk.Checkbutton(self.frame_main_bat, bg=self.light_grey, variable=self.dict_bat_relay_var[relay_name], state='disabled')
+                relay_name = self.dict_pack_to_code[self.ordered_pack_names[name_index]] + 'r' + str(relay_index+1)
+                self.dict_bat_relay_var[relay_name] = tk.IntVar(value=1)
+                self.dict_bat_relay_but[relay_name] = tk.Checkbutton(self.frame_main_bat, bg=self.light_grey, variable=self.dict_bat_relay_var[relay_name])
                 self.dict_bat_relay_but[relay_name].grid(row=3+name_index, column=1+relay_index)
 
         self.but_bat_ex.grid(row=10, column=15, sticky='e')
@@ -952,7 +1072,6 @@ class GUI(object):
         #############################################################
         # TERMINAL OPTIONS CONTAINER ################################
         #############################################################
-        # FIXME IEB status flag button functionality is not implemented yet 
         self.label_trm_title = tk.Label(self.frame_main_trm, text='Terminal Options',  font=self.frame_font, bg=self.light_grey)
         self.label_trm_bat_options = tk.Label(self.frame_main_trm, text='Battery Packs to Print:', font=self.label_font_bold, bg=self.light_grey)
         self.var_trm_b4 = tk.IntVar()
@@ -975,7 +1094,6 @@ class GUI(object):
         self.var_trm_k = tk.IntVar()
         self.var_trm_q = tk.IntVar()
         self.var_trm_c = tk.IntVar()
-        self.var_trm_f = tk.IntVar()
         self.checkbut_trm_v = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_v)
         self.checkbut_trm_i = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_i)
         self.checkbut_trm_ai= tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_ai)
@@ -983,7 +1101,6 @@ class GUI(object):
         self.checkbut_trm_k = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_k)
         self.checkbut_trm_q = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_q)
         self.checkbut_trm_c = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_c)
-        self.checkbut_trm_f = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_f, state='disabled')
         self.label_trm_v = tk.Label(self.frame_main_trm, text='Voltage (mV)', font=self.label_font, bg=self.light_grey)
         self.label_trm_i = tk.Label(self.frame_main_trm, text='Current (mA)', font=self.label_font, bg=self.light_grey)
         self.label_trm_ai= tk.Label(self.frame_main_trm, text='Aggregate Current (mA)', font=self.label_font, bg=self.light_grey)
@@ -991,7 +1108,6 @@ class GUI(object):
         self.label_trm_k = tk.Label(self.frame_main_trm, text='Temperature (K)', font=self.label_font, bg=self.light_grey)
         self.label_trm_q = tk.Label(self.frame_main_trm, text='Charge State (mAhrs)', font=self.label_font, bg=self.light_grey)
         self.label_trm_c = tk.Label(self.frame_main_trm, text='Desired Charge Rate (mA)', font=self.label_font, bg=self.light_grey)
-        self.label_trm_f = tk.Label(self.frame_main_trm, text='IEB Status Flags', font=self.label_font, bg=self.light_grey)
         self.but_trm_ex = tk.Button(self.frame_main_trm, text='Execute', highlightbackground=self.light_grey, command=self.callback_trm_ex)
 
         self.label_trm_title.grid(row=0, column=0, columnspan=1, sticky='nsew')
@@ -1012,7 +1128,6 @@ class GUI(object):
         self.checkbut_trm_k.grid(row=9, column=1, sticky='w')
         self.checkbut_trm_q.grid(row=10, column=1, sticky='w')
         self.checkbut_trm_c.grid(row=11, column=1, sticky='w')
-        self.checkbut_trm_f.grid(row=12, column=1, sticky='w')
         self.label_trm_v.grid(row=5, column=2, sticky='w')
         self.label_trm_i.grid(row=6, column=2, sticky='w')
         self.label_trm_ai.grid(row=7, column=2, sticky='w')
@@ -1020,8 +1135,7 @@ class GUI(object):
         self.label_trm_k.grid(row=9, column=2, sticky='w')
         self.label_trm_q.grid(row=10, column=2, sticky='w')
         self.label_trm_c.grid(row=11, column=2, sticky='w')
-        self.label_trm_f.grid(row=12, column=2, sticky='w')
-        self.but_trm_ex.grid(row=13, column=3, sticky='e')
+        self.but_trm_ex.grid(row=12, column=3, sticky='e')
 
 
     def init_bot_group(self):
@@ -1040,8 +1154,8 @@ class GUI(object):
 #############################################################
 # MAIN ######################################################
 #############################################################
-if __name__ == "__main__":
-    warnings.filterwarnings("ignore",".*GUI is implemented.*")
+if __name__ == '__main__':
+    warnings.filterwarnings('ignore','.*GUI is implemented.*')
     root = tk.Tk()
     gui = GUI(root)
     root.mainloop()
