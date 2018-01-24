@@ -5,7 +5,7 @@
 # - Allows for charging and discharging control of the battery pack
 # 
 # Author: Zach Duguid
-# Last Updated: 01/18/2018
+# Last Updated: 01/23/2018
 
 
 import serial
@@ -113,12 +113,8 @@ class PowerSupply(object):
         # convert interger command to hex command 
         input_cmd = '{0:x}'.format(input_val)
 
-        # convert to a positive hex command if command is input_cmd is negative
-        if int(input_cmd, 16) < 0: 
-            input_cmd = '{0:x}'.format(int('ffffffff', self.hex_base) + int(input_cmd) +1)
-
         # send voltage command to the power supply via the serial bus
-        bus.send_cmd(self.name + self.voltage_channel + str(input_cmd) + self.execute_str)
+        bus.send_cmd(self.name + self.voltage_channel + input_cmd + self.execute_str)
 
 
     def set_current(self, target_current, bus):
@@ -130,14 +126,8 @@ class PowerSupply(object):
         # convert interger command to hex command 
         input_cmd = '{0:x}'.format(input_val)
 
-        # convert to a positive hex command if command is input_cmd is negative
-        if int(input_cmd, 16) < 0: 
-            input_cmd = '{0:x}'.format(int('ffffffff', self.hex_base) + int(input_cmd) + 1)
-
-        print(input_cmd)
-
         # send current command to the power supply via the serial bus
-        bus.send_cmd(self.name + self.current_channel + str(input_cmd) + self.execute_str)
+        bus.send_cmd(self.name + self.current_channel + input_cmd + self.execute_str)
 
 
     def set_load(self, load1, load2, bus):
@@ -295,10 +285,10 @@ class GUI(object):
                 self.entry_pwr_v.insert(0, desired_voltage)
                 self.entry_pwr_i.insert(0, desired_current)
 
-            # confirm correct format of user variables
+            # confirm correct format of user variables, does not allow negative values
             try:
-                desired_voltage = float(desired_voltage)
-                desired_current = float(desired_current)
+                desired_voltage = max(float(desired_voltage), 0)
+                desired_current = max(float(desired_current), 0)
 
                 # send relevant power supply commands via the serial bus
                 self.pwr_supply.set_voltage(desired_voltage, self.bus)
