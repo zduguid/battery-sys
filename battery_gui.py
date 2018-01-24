@@ -1150,4 +1150,3 @@ if __name__ == '__main__':
     gui = GUI(root)
     root.resizable(0,0)
     root.mainloop()
-
