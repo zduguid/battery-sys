@@ -5,13 +5,14 @@
 # - Allows for charging and discharging control of the battery pack
 # 
 # Author: Zach Duguid
-# Last Updated: 01/31/2018
+# Last Updated: 02/01/2018
 
 
 import serial
 import time
 import datetime
 import matplotlib
+import matplotlib.dates as mdates
 matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
@@ -180,18 +181,19 @@ class GUI(object):
         self.dict_pack_to_name = {'Pack 1':'Payload Pack', 'Pack 2':'Aft-Long', 'Pack 3':'Aft-Short', 'Pack 4':'Pitch Pack'}
         self.dict_code_to_pack = {'#bat1':'Pack 1', '#bat2':'Pack 2', '#bat3':'Pack 3', '#bat4':'Pack 4'}
         self.dict_pack_to_code = {'Pack 1':'#bat1', 'Pack 2':'#bat2', 'Pack 3':'#bat3', 'Pack 4':'#bat4'}
+        self.dict_pack_to_abbr = {'Pack 4':'PI', 'Pack 1':'PA', 'Pack 3':'AS', 'Pack 2':'AL'}
         self.dict_pack_to_bat = {}
         self.dict_bat_to_code = {}
         self.dict_bat_to_packindex = {}
         self.total_bat_count = 0
         
-        for name in self.list_pack_names:
+        for name in self.ordered_pack_names:
             self.dict_pack_to_bat[name] = []
             for i in range(1, self.dict_pack_to_nums[name]+1):
-                self.total_bat_count += 1
-                self.dict_pack_to_bat[name].append('B'+str(self.total_bat_count))
-                self.dict_bat_to_code['B'+str(self.total_bat_count)] = self.dict_pack_to_code[name]
-                self.dict_bat_to_packindex['B'+str(self.total_bat_count)] = i-1
+                bat_code = self.dict_pack_to_abbr[name] + str(i)
+                self.dict_pack_to_bat[name].append(bat_code)
+                self.dict_bat_to_code[bat_code] = self.dict_pack_to_code[name]
+                self.dict_bat_to_packindex[bat_code] = i-1
 
         self.execute_str = 'x'          # syntax for the termination of a command
 
@@ -419,19 +421,20 @@ class GUI(object):
             bat_list = []
             var_list = []
             pack_data = {}
+            legend_on = False
 
             # determine battery and question commands to send to the batteries via the serial bus
+            if self.var_gra_b4.get() == 1:
+                bat_list.append('#bat4')
+
             if self.var_gra_b1.get() == 1:
                 bat_list.append('#bat1')
-
-            if self.var_gra_b2.get() == 1:
-                bat_list.append('#bat2')
 
             if self.var_gra_b3.get() == 1:
                 bat_list.append('#bat3')
 
-            if self.var_gra_b4.get() == 1:
-                bat_list.append('#bat4')
+            if self.var_gra_b2.get() == 1:
+                bat_list.append('#bat2')
 
             if self.var_gra_v.get() == 1:
                 var_list.append('?v')
@@ -493,6 +496,7 @@ class GUI(object):
                 plt.rc('lines', linewidth=1)
                 plt.tight_layout()
                 ax.grid()
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
             # set plot labels for when more than one variable is selected
             else:
@@ -503,6 +507,7 @@ class GUI(object):
                     plt.rc('lines', linewidth=1)
                     plt.tight_layout()
                     ax[i].grid()
+                ax[-1].xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
             # specficy graphing parameters (i.e. text display, colors, etc.)
             plt.gcf().autofmt_xdate()
@@ -529,32 +534,40 @@ class GUI(object):
                         # iterate through the variables to be questioned
                         for var in var_list:
 
-                            # extract latency and bat_readings data (when aggregate current not requested)
-                            if var != '?ai':
-                                latency, bat_readings = self.bus.send_cmd(bat+var)
+                            # check if batteries are responding
+                            try:
 
-                                # decode the bat_readings data into integer format
-                                bat_readings_int = [int(element, self.hex_base) for element in bat_readings if element!='']
+                                # extract latency and bat_readings data (when aggregate current not requested)
+                                if var != '?ai':
+                                    latency, bat_readings = self.bus.send_cmd(bat+var)
 
-                                # convert voltage reading from [mV] to [V]
-                                if var == '?v':
-                                    bat_readings_int = [reading/1000.0 for reading in bat_readings_int]
+                                    # decode the bat_readings data into integer format
+                                    bat_readings_int = [int(element, self.hex_base) for element in bat_readings if element!='']
 
-                                # convert current data to negative values as necessary (negative indicates battery discharge) 
-                                elif var == '?i':
-                                    bat_readings_int = [reading - self.current_adjust if reading > self.current_threshold else reading for reading in bat_readings_int]
+                                    # convert voltage reading from [mV] to [V]
+                                    if var == '?v':
+                                        bat_readings_int = [round((reading/1000.0), 2) for reading in bat_readings_int]
 
-                                # convert temperature data from [K]*10 to [C]
-                                elif var == '?k':
-                                    bat_readings_int = [reading/10 - 273.15 for reading in bat_readings_int]
+                                    # convert current data to negative values as necessary (negative indicates battery discharge) 
+                                    elif var == '?i':
+                                        bat_readings_int = [reading - self.current_adjust if reading > self.current_threshold else reading for reading in bat_readings_int]
 
-                                # add converted bat_reading_int data to pack_data variable
-                                for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]]):
-                                    pack_data[bat][var][i].append(bat_readings_int[i])
+                                    # convert temperature data from [K]*10 to [C]
+                                    elif var == '?k':
+                                        bat_readings_int = [reading/10 - 273.15 for reading in bat_readings_int]
 
-                            # if aggregate current is requested, sum over the current readings of the individual batteries, then add to pack_data
-                            else:
-                                pack_data[bat][var].append(sum([pack_data[bat]['?i'][bat_num][-1] for bat_num in range(len(pack_data[bat]['?i']))]))
+                                    # add converted bat_reading_int data to pack_data variable
+                                    for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]]):
+                                        pack_data[bat][var][i].append(bat_readings_int[i])
+
+                                # if aggregate current is requested, sum over the current readings of the individual batteries, then add to pack_data
+                                else:
+                                    pack_data[bat][var].append(sum([pack_data[bat]['?i'][bat_num][-1] for bat_num in range(len(pack_data[bat]['?i']))]))
+
+                            # if batteries are not responding, notify uer of the error and break out of the loop
+                            except TypeError:
+                                messagebox.showerror('ERROR', 'Warning: some or all battery packs are not responding')
+                                break
 
                     # plotting process for when one variable is selected
                     if len(var_list) == 1:
@@ -564,11 +577,20 @@ class GUI(object):
                             cur_bat = legend_list[i]
                             ax.plot(pack_data[self.dict_bat_to_code[cur_bat]]['time'], 
                                     pack_data[self.dict_bat_to_code[cur_bat]][var_list[0]][self.dict_bat_to_packindex[cur_bat]],
-                                    color_list[i])
+                                    color_list[i],
+                                    label=cur_bat)
+
+                        # initialize legend for single subplot case
+                        if legend_on == False:
+                            ax.legend(loc=2)
+                            legend_on = True
 
                     # plotting process for when more than one variable is selected
                     else:
                         for v in range(len(var_list)):
+
+                            # keep track of handle list in order to produce the appropriate legend
+                            handle_list = []
 
                             # plotting behavior for non-aggregate-current variables
                             if var_list[v] != '?ai':
@@ -576,9 +598,10 @@ class GUI(object):
 
                                     # identify the current battery
                                     cur_bat = legend_list[i]
-                                    ax[v].plot(pack_data[self.dict_bat_to_code[cur_bat]]['time'], 
+                                    line, = ax[v].plot(pack_data[self.dict_bat_to_code[cur_bat]]['time'], 
                                                pack_data[self.dict_bat_to_code[cur_bat]][var_list[v]][self.dict_bat_to_packindex[cur_bat]],
                                                color_list[i])
+                                    handle_list.append(line)
 
                             # plotting behavior for aggregate current behavior
                             else:
@@ -586,6 +609,11 @@ class GUI(object):
                                     ax[v].plot(pack_data[bat_list[i]]['time'],
                                                pack_data[bat_list[i]]['?ai'],
                                                color_list_ai[i])
+
+                        # initialize legend for multiple subplot case
+                        if legend_on == False:
+                            fig.legend(handles=handle_list, labels=legend_list, loc=2)
+                            legend_on = True
 
                     try:
                         # pause plot in order for new data to update
