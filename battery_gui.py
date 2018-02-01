@@ -5,7 +5,7 @@
 # - Allows for charging and discharging control of the battery pack
 # 
 # Author: Zach Duguid
-# Last Updated: 01/23/2018
+# Last Updated: 01/31/2018
 
 
 import serial
@@ -195,7 +195,7 @@ class GUI(object):
 
         self.execute_str = 'x'          # syntax for the termination of a command
 
-        self.dict_axis_info = {'?v'   : 'Voltage (mV)',
+        self.dict_axis_info = {'?v'   : 'Voltage (V)',
                                '?i'   : 'Current (mA)',
                                '?ai'  : 'Aggregate Current (mA)',
                                '?p'   : 'Percent Charge (%)',
@@ -272,10 +272,6 @@ class GUI(object):
             load1 = self.var_pwr_l1.get()
             load2 = self.var_pwr_l2.get()
 
-            # notify the user if a high voltage or high current is selected
-            if (desired_voltage > self.pwr_supply.max_voltage) or (desired_current > self.pwr_supply.max_current):
-                messagebox.showerror('WARNING', 'High voltage or high current detected. Proceed with caution')
-
             # do not allow volate/current to remain non-zero when loads are turned on
             if (load1==1) or (load2==1):
                 desired_voltage = 0
@@ -289,6 +285,10 @@ class GUI(object):
             try:
                 desired_voltage = max(float(desired_voltage), 0)
                 desired_current = max(float(desired_current), 0)
+
+                # notify the user if a high voltage or high current is selected
+                if (desired_voltage > self.pwr_supply.max_voltage) or (desired_current > self.pwr_supply.max_current):
+                    messagebox.showerror('WARNING', 'High voltage or high current detected. Proceed with caution')
 
                 # send relevant power supply commands via the serial bus
                 self.pwr_supply.set_voltage(desired_voltage, self.bus)
@@ -534,15 +534,19 @@ class GUI(object):
                                 latency, bat_readings = self.bus.send_cmd(bat+var)
 
                                 # decode the bat_readings data into integer format
-                                bat_readings_int = [int(element,self.hex_base) for element in bat_readings if element!='']
+                                bat_readings_int = [int(element, self.hex_base) for element in bat_readings if element!='']
 
-                                # convert temperature data from K*10 -> C as necessary
-                                if var == '?k':
-                                    bat_readings_int = [reading/10 - 273.15 for reading in bat_readings_int]
+                                # convert voltage reading from [mV] to [V]
+                                if var == '?v':
+                                    bat_readings_int = [reading/1000.0 for reading in bat_readings_int]
 
                                 # convert current data to negative values as necessary (negative indicates battery discharge) 
                                 elif var == '?i':
                                     bat_readings_int = [reading - self.current_adjust if reading > self.current_threshold else reading for reading in bat_readings_int]
+
+                                # convert temperature data from [K]*10 to [C]
+                                elif var == '?k':
+                                    bat_readings_int = [reading/10 - 273.15 for reading in bat_readings_int]
 
                                 # add converted bat_reading_int data to pack_data variable
                                 for i in range(self.dict_pack_to_nums[self.dict_code_to_pack[bat]]):
@@ -1021,7 +1025,7 @@ class GUI(object):
         self.checkbut_gra_k = tk.Checkbutton(self.frame_main_gra, bg=self.light_grey, variable=self.var_gra_k)
         self.checkbut_gra_q = tk.Checkbutton(self.frame_main_gra, bg=self.light_grey, variable=self.var_gra_q)
         self.checkbut_gra_c = tk.Checkbutton(self.frame_main_gra, bg=self.light_grey, variable=self.var_gra_c)
-        self.label_gra_v = tk.Label(self.frame_main_gra, text='Voltage [mV]', font=self.label_font, bg=self.light_grey)
+        self.label_gra_v = tk.Label(self.frame_main_gra, text='Voltage [V]', font=self.label_font, bg=self.light_grey)
         self.label_gra_i = tk.Label(self.frame_main_gra, text='Current [mA]', font=self.label_font, bg=self.light_grey)
         self.label_gra_ai= tk.Label(self.frame_main_gra, text='Aggregate Current [mA]', font=self.label_font, bg=self.light_grey)
         self.label_gra_p = tk.Label(self.frame_main_gra, text='Percent Charge [%]', font=self.label_font, bg=self.light_grey)
@@ -1091,7 +1095,7 @@ class GUI(object):
         self.checkbut_trm_k = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_k)
         self.checkbut_trm_q = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_q)
         self.checkbut_trm_c = tk.Checkbutton(self.frame_main_trm, bg=self.light_grey, variable=self.var_trm_c)
-        self.label_trm_v = tk.Label(self.frame_main_trm, text='Voltage [mV]', font=self.label_font, bg=self.light_grey)
+        self.label_trm_v = tk.Label(self.frame_main_trm, text='Voltage [V]', font=self.label_font, bg=self.light_grey)
         self.label_trm_i = tk.Label(self.frame_main_trm, text='Current [mA]', font=self.label_font, bg=self.light_grey)
         self.label_trm_ai= tk.Label(self.frame_main_trm, text='Aggregate Current [mA]', font=self.label_font, bg=self.light_grey)
         self.label_trm_p = tk.Label(self.frame_main_trm, text='Percent Charge [%]', font=self.label_font, bg=self.light_grey)
