@@ -5,7 +5,7 @@
 # - Allows for charging and discharging control of the battery pack
 # 
 # Author: Zach Duguid
-# Last Updated: 02/01/2018
+# Last Updated: 02/03/2018
 
 
 import serial
@@ -95,8 +95,10 @@ class PowerSupply(object):
         self.i_offset = i_offset        # current offset of the power supply
         self.max_voltage = 16           # conservative value for now
         self.max_current = 4            # conservative value for now
-        self.voltage_channel = '!a1.'   # name of voltage channel
-        self.current_channel = '!a2.'   # name of current channel
+        self.supply1_v_channel = '!a1.' # name of voltage channel for supply 1
+        self.supply1_c_channel = '!a2.' # name of current channel for supply 1
+        self.supply2_v_channel = '!a3.' # name of voltage channel for supply 2
+        self.supply2_c_channel = '!a4.' # name of current channel for supply 2
         self.execute_str = 'x'          # syntax for the termination of a command
         self.load1_channel = '!p2'      # name of load1 channel 
         self.load2_channel = '!p3'      # name of load2 channel
@@ -105,7 +107,7 @@ class PowerSupply(object):
         self.hex_base = 16              # used in hex -> dec conversion
 
 
-    def set_voltage(self, target_voltage, bus):
+    def set_voltage(self, target_voltage, channel, bus):
         ''' command power supply to target voltage, subject to maximum voltage limitation
         '''
         # determine input command
@@ -115,10 +117,10 @@ class PowerSupply(object):
         input_cmd = '{0:x}'.format(input_val)
 
         # send voltage command to the power supply via the serial bus
-        bus.send_cmd(self.name + self.voltage_channel + input_cmd + self.execute_str)
+        bus.send_cmd(self.name + channel + input_cmd + self.execute_str)
 
 
-    def set_current(self, target_current, bus):
+    def set_current(self, target_current, channel, bus):
         ''' command power supply to target current, subject to maximum current limitation
         '''
         # determine input command
@@ -128,7 +130,7 @@ class PowerSupply(object):
         input_cmd = '{0:x}'.format(input_val)
 
         # send current command to the power supply via the serial bus
-        bus.send_cmd(self.name + self.current_channel + input_cmd + self.execute_str)
+        bus.send_cmd(self.name + channel + input_cmd + self.execute_str)
 
 
     def set_load(self, load1, load2, bus):
@@ -156,6 +158,7 @@ class GUI(object):
         master.title('Slocum Glider Battery System Tool')
         self.bus_connected = False
         self.scan_time = None 
+        self.discharge_on = False 
 
         # custom GUI parameters (i.e. font styles, GUI colors, etc.)
         self.frame_font = tkFont.Font(family='Helvetica', size=16, weight='bold', slant='italic', underline=1)
@@ -173,6 +176,7 @@ class GUI(object):
         self.current_adjust = 65536         # used for adjusting negative current
         self.hex_base = 16                  # used in hex -> dec conversion
         self.color_map = 'gist_ncar'        # used for establishing the graph colors 
+        self.pwr_entry_width = 20            # width of entry widget within the power supply group
 
         # battery pack information and nomenclature
         self.ordered_pack_names = ['Pack 4', 'Pack 1', 'Pack 3', 'Pack 2']
@@ -269,34 +273,54 @@ class GUI(object):
 
         else:
             # extract user entered parameters 
-            desired_voltage = self.entry_pwr_v.get()
-            desired_current = self.entry_pwr_i.get()
-            load1 = self.var_pwr_l1.get()
-            load2 = self.var_pwr_l2.get()
+            desired_voltage_s1 = self.entry_pwr_s1_v.get()
+            desired_current_s1 = self.entry_pwr_s1_i.get()
+            desired_voltage_s2 = self.entry_pwr_s2_v.get()
+            desired_current_s2 = self.entry_pwr_s2_i.get()
+            if self.discharge_on:
+                load1 = self.var_pwr_l1.get()
+                load2 = self.var_pwr_l2.get()
 
             # do not allow volate/current to remain non-zero when loads are turned on
-            if (load1==1) or (load2==1):
-                desired_voltage = 0
-                desired_current = 0
-                self.entry_pwr_v.delete(0, tk.END)
-                self.entry_pwr_i.delete(0, tk.END)
-                self.entry_pwr_v.insert(0, desired_voltage)
-                self.entry_pwr_i.insert(0, desired_current)
+            if self.discharge_on:
+                if (load1==1) or (load2==1):
+                    desired_voltage_s1 = 0
+                    desired_current_s1 = 0
+                    desired_voltage_s2 = 0
+                    desired_current_s2 = 0
+                    self.entry_pwr_s1_v.delete(0, tk.END)
+                    self.entry_pwr_s1_i.delete(0, tk.END)
+                    self.entry_pwr_s1_v.insert(0, desired_voltage_s1)
+                    self.entry_pwr_s1_i.insert(0, desired_current_s1)
+                    self.entry_pwr_s2_v.delete(0, tk.END)
+                    self.entry_pwr_s2_i.delete(0, tk.END)
+                    self.entry_pwr_s2_v.insert(0, desired_voltage_s2)
+                    self.entry_pwr_s2_i.insert(0, desired_current_s2)
 
             # confirm correct format of user variables, does not allow negative values
             try:
-                desired_voltage = max(float(desired_voltage), 0)
-                desired_current = max(float(desired_current), 0)
+                desired_voltage_s1 = max(float(desired_voltage_s1), 0)
+                desired_current_s1 = max(float(desired_current_s1), 0)
+                desired_voltage_s2 = max(float(desired_voltage_s2), 0)
+                desired_current_s2 = max(float(desired_current_s2), 0)
 
                 # notify the user if a high voltage or high current is selected
-                if (desired_voltage > self.pwr_supply.max_voltage) or (desired_current > self.pwr_supply.max_current):
+                if (desired_voltage_s1 > self.pwr_supply.max_voltage) or \
+                   (desired_current_s1 > self.pwr_supply.max_current) or \
+                   (desired_voltage_s2 > self.pwr_supply.max_voltage) or \
+                   (desired_current_s2 > self.pwr_supply.max_current):
                     messagebox.showerror('WARNING', 'High voltage or high current detected. Proceed with caution')
 
                 # send relevant power supply commands via the serial bus
-                self.pwr_supply.set_voltage(desired_voltage, self.bus)
-                self.pwr_supply.set_current(desired_current, self.bus)
-                self.pwr_supply.set_load(load1, load2, self.bus)
-                print('>> Voltage, Current, Load commands sent')
+                self.pwr_supply.set_voltage(desired_voltage_s1, self.supply1_v_channel, self.bus)
+                self.pwr_supply.set_current(desired_current_s1, self.supply1_c_channel, self.bus)
+                self.pwr_supply.set_voltage(desired_voltage_s2, self.supply2_v_channel, self.bus)
+                self.pwr_supply.set_current(desired_current_s2, self.supply2_c_channel, self.bus)
+                if self.discharge_on:
+                    self.pwr_supply.set_load(load1, load2, self.bus)
+                    print('>> Voltage, Current, Load commands sent')
+                else:
+                    print('>> Voltage, Current commands sent')
 
             # display error message if incorrected data format is used
             except ValueError:
@@ -310,11 +334,15 @@ class GUI(object):
                 if there is not a connection with the serial bus
                 if invalid scan command is sent
         '''
-        # check serial bus connection
+        # check serial bus connection   
         if not self.bus_connected:
             messagebox.showerror('ERROR', 'You are not connected to the Serial Bus')
 
         else:
+            # for safety, turn power off before switching relays and warn user to turn off manual power supply
+            self.callback_recharge_off()
+            messagebox.showerror('WARNING', 'Confirm that any manual power supplies are turned off before continuing')
+
             # extract user entered parameters 
             desired_scan_time = self.entry_bat_scan.get()
 
@@ -492,7 +520,6 @@ class GUI(object):
                 ax.set_title(self.graph_title)
                 ax.set_ylabel(self.dict_axis_info[var_list[0]])
                 ax.set_xlabel(self.dict_axis_info['time'])
-                ax.legend(legend_list)
                 plt.rc('lines', linewidth=1)
                 plt.tight_layout()
                 ax.grid()
@@ -582,8 +609,10 @@ class GUI(object):
 
                         # initialize legend for single subplot case
                         if legend_on == False:
-                            ax.legend(loc=2)
+                            leg = ax.legend(loc=2, prop={'size':10})
                             legend_on = True
+                            for legobj in leg.legendHandles:
+                                legobj.set_linewidth(2.0)
 
                     # plotting process for when more than one variable is selected
                     else:
@@ -612,8 +641,10 @@ class GUI(object):
 
                         # initialize legend for multiple subplot case
                         if legend_on == False:
-                            fig.legend(handles=handle_list, labels=legend_list, loc=2)
+                            leg = fig.legend(handles=handle_list, labels=legend_list, loc=2, prop={'size':10})
                             legend_on = True
+                            for legobj in leg.legendHandles:
+                                legobj.set_linewidth(2.0)
 
                     try:
                         # pause plot in order for new data to update
@@ -869,14 +900,27 @@ class GUI(object):
 
         # send relevant commands to the powersupply 
         else:
-            desired_current = 0
-            desired_voltage = 0 
-            load1 = 0
-            load2 = 0
-            self.pwr_supply.set_voltage(desired_voltage, self.bus)
-            self.pwr_supply.set_current(desired_current, self.bus)
-            self.pwr_supply.set_load(load1, load2, self.bus) 
-            print('>> POWER OFF command sent')
+            desired_voltage_s1 = 0
+            desired_current_s1 = 0
+            desired_voltage_s2 = 0
+            desired_current_s2 = 0  
+            self.pwr_supply.set_voltage(desired_voltage_s1, self.supply1_v_channel, self.bus)
+            self.pwr_supply.set_current(desired_current_s1, self.supply1_c_channel, self.bus)
+            self.pwr_supply.set_voltage(desired_voltage_s2, self.supply2_v_channel, self.bus)
+            self.pwr_supply.set_current(desired_current_s2, self.supply2_c_channel, self.bus)
+            self.entry_pwr_s1_v.delete(0, tk.END)
+            self.entry_pwr_s1_i.delete(0, tk.END)
+            self.entry_pwr_s1_v.insert(0, desired_voltage_s1)
+            self.entry_pwr_s1_i.insert(0, desired_current_s1)
+            self.entry_pwr_s2_v.delete(0, tk.END)
+            self.entry_pwr_s2_i.delete(0, tk.END)
+            self.entry_pwr_s2_v.insert(0, desired_voltage_s2)
+            self.entry_pwr_s2_i.insert(0, desired_current_s2)
+            if self.discharge_on:
+                load1 = 0
+                load2 = 0
+                self.pwr_supply.set_load(load1, load2, self.bus) 
+            print('>> RECHARGE OFF command sent')
 
 
     def callback_connect(self):
@@ -943,41 +987,63 @@ class GUI(object):
         # POWER SUPPLY CONTAINER ####################################
         #############################################################
         self.label_pwr_title = tk.Label(self.frame_main_pwr, text='Power Supply', font=self.frame_font, bg=self.light_grey)
-        self.label_pwr_v = tk.Label(self.frame_main_pwr, text='Voltage:', font=self.label_font_bold, bg=self.light_grey)
-        self.label_pwr_i = tk.Label(self.frame_main_pwr, text='Current:', font=self.label_font_bold, bg=self.light_grey)
-        self.label_pwr_v2 = tk.Label(self.frame_main_pwr, text='[V]', font=self.label_font, bg=self.light_grey)
-        self.label_pwr_i2 = tk.Label(self.frame_main_pwr, text='[A]', font=self.label_font, bg=self.light_grey)
-        self.label_pwr_l1 = tk.Label(self.frame_main_pwr, text='Discharge Load 1:', font=self.label_font_bold, bg=self.light_grey)
-        self.label_pwr_l2 = tk.Label(self.frame_main_pwr, text='Discharge Load 2:', font=self.label_font_bold, bg=self.light_grey)
-        self.entry_pwr_v = tk.Entry(self.frame_main_pwr, highlightbackground=self.light_grey)
-        self.entry_pwr_v.insert(0,0.0)
-        self.entry_pwr_i = tk.Entry(self.frame_main_pwr, highlightbackground=self.light_grey)
-        self.entry_pwr_i.insert(0,0.0)
-        self.var_pwr_l1 = tk.IntVar()
-        self.var_pwr_l2 = tk.IntVar()
-        self.checkbut_pwr_l1 = tk.Checkbutton(self.frame_main_pwr, bg=self.light_grey, variable=self.var_pwr_l1)
-        self.checkbut_pwr_l2 = tk.Checkbutton(self.frame_main_pwr, bg=self.light_grey, variable=self.var_pwr_l2)
+        self.label_pwr_s1_title = tk.Label(self.frame_main_pwr, text='Power Supply 1', font=self.label_font_bold, bg=self.light_grey)
+        self.label_pwr_s1_v = tk.Label(self.frame_main_pwr, text='Voltage:', font=self.label_font_bold, bg=self.light_grey)
+        self.label_pwr_s1_i = tk.Label(self.frame_main_pwr, text='Current:', font=self.label_font_bold, bg=self.light_grey)
+        self.label_pwr_s1_v2 = tk.Label(self.frame_main_pwr, text='[V]', font=self.label_font, bg=self.light_grey)
+        self.label_pwr_s1_i2 = tk.Label(self.frame_main_pwr, text='[A]', font=self.label_font, bg=self.light_grey)
+        self.entry_pwr_s1_v = tk.Entry(self.frame_main_pwr, highlightbackground=self.light_grey, width=self.pwr_entry_width)
+        self.entry_pwr_s1_v.insert(0,0.0)
+        self.entry_pwr_s1_i = tk.Entry(self.frame_main_pwr, highlightbackground=self.light_grey, width=self.pwr_entry_width)
+        self.entry_pwr_s1_i.insert(0,0.0)
+        self.label_pwr_spacer = tk.Label(self.frame_main_pwr, text=' ', font=self.label_font, bg=self.light_grey)
+        self.label_pwr_s2_title = tk.Label(self.frame_main_pwr, text='Power Supply 2', font=self.label_font_bold, bg=self.light_grey)
+        self.label_pwr_s2_v = tk.Label(self.frame_main_pwr, text='Voltage:', font=self.label_font_bold, bg=self.light_grey)
+        self.label_pwr_s2_i = tk.Label(self.frame_main_pwr, text='Current:', font=self.label_font_bold, bg=self.light_grey)
+        self.label_pwr_s2_v2 = tk.Label(self.frame_main_pwr, text='[V]', font=self.label_font, bg=self.light_grey)
+        self.label_pwr_s2_i2 = tk.Label(self.frame_main_pwr, text='[A]', font=self.label_font, bg=self.light_grey)
+        self.entry_pwr_s2_v = tk.Entry(self.frame_main_pwr, highlightbackground=self.light_grey, width=self.pwr_entry_width)
+        self.entry_pwr_s2_v.insert(0,0.0)
+        self.entry_pwr_s2_i = tk.Entry(self.frame_main_pwr, highlightbackground=self.light_grey, width=self.pwr_entry_width)
+        self.entry_pwr_s2_i.insert(0,0.0)
         self.but_pwr_ex = tk.Button(self.frame_main_pwr, text='Execute', highlightbackground=self.light_grey, command=self.callback_pwr_ex)
-
+    
         self.label_pwr_title.grid(row=0, columnspan=1, column=0, sticky='w')
-        self.label_pwr_v.grid(row=1, column=0, sticky='e')
-        self.label_pwr_i.grid(row=2, column=0, sticky='e')
-        self.label_pwr_v2.grid(row=1, column=2, sticky='w')
-        self.label_pwr_i2.grid(row=2, column=2, sticky='w')
-        self.label_pwr_l1.grid(row=3, column=0, sticky='e')
-        self.label_pwr_l2.grid(row=4, column=0, sticky='e')
-        self.entry_pwr_v.grid(row=1, column=1, sticky='nsew')
-        self.entry_pwr_i.grid(row=2, column=1, sticky='nsew')
-        self.checkbut_pwr_l1.grid(row=3,column=1, sticky='w')
-        self.checkbut_pwr_l2.grid(row=4,column=1, sticky='w')
-        self.but_pwr_ex.grid(row=5, column=3, sticky='e')
+        self.label_pwr_s1_title.grid(row=1, column=1, sticky='ew')
+        self.label_pwr_s1_v.grid(row=2, column=0, sticky='e')
+        self.label_pwr_s1_i.grid(row=3, column=0, sticky='e')
+        self.label_pwr_s1_v2.grid(row=2, column=2, sticky='w')
+        self.label_pwr_s1_i2.grid(row=3, column=2, sticky='w')
+        self.entry_pwr_s1_v.grid(row=2, column=1, sticky='w')
+        self.entry_pwr_s1_i.grid(row=3, column=1, sticky='nsew')
+        self.label_pwr_spacer.grid(row=4, column=1, sticky='w')
+        self.label_pwr_s2_title.grid(row=5, column=1, sticky='ew')
+        self.label_pwr_s2_v.grid(row=6, column=0, sticky='e')
+        self.label_pwr_s2_i.grid(row=7, column=0, sticky='e')
+        self.label_pwr_s2_v2.grid(row=6, column=2, sticky='w')
+        self.label_pwr_s2_i2.grid(row=7, column=2, sticky='w')
+        self.entry_pwr_s2_v.grid(row=6, column=1, sticky='w')
+        self.entry_pwr_s2_i.grid(row=7, column=1, sticky='nsew')
+        self.but_pwr_ex.grid(row=8, column=3, sticky='e')
+
+        if self.discharge_on:
+            self.var_pwr_l1 = tk.IntVar()
+            self.var_pwr_l2 = tk.IntVar()
+            self.label_pwr_l1 = tk.Label(self.frame_main_pwr, text='Discharge Load 1:', font=self.label_font_bold, bg=self.light_grey)
+            self.label_pwr_l2 = tk.Label(self.frame_main_pwr, text='Discharge Load 2:', font=self.label_font_bold, bg=self.light_grey)
+            self.checkbut_pwr_l1 = tk.Checkbutton(self.frame_main_pwr, bg=self.light_grey, variable=self.var_pwr_l1)
+            self.checkbut_pwr_l2 = tk.Checkbutton(self.frame_main_pwr, bg=self.light_grey, variable=self.var_pwr_l2)
+            self.label_pwr_l1.grid(row=3, column=0, sticky='e')
+            self.label_pwr_l2.grid(row=4, column=0, sticky='e')
+            self.checkbut_pwr_l1.grid(row=3,column=1, sticky='w')
+            self.checkbut_pwr_l2.grid(row=4,column=1, sticky='w')
 
 
     def init_bat_group(self):
         #############################################################
         # BATTERY PACK CONTAINER ####################################
         #############################################################
-        self.label_bat_title = tk.Label(self.frame_main_bat, text='Batter Pack',   font=self.frame_font, bg=self.light_grey)
+        self.label_bat_title = tk.Label(self.frame_main_bat, text='Battery Pack',   font=self.frame_font, bg=self.light_grey)
         self.label_bat_scan = tk.Label(self.frame_main_bat, text='Scan Time:',    font=self.label_font_bold, bg=self.light_grey)
         self.label_bat_scan2 = tk.Label(self.frame_main_bat, text='[s]',           font=self.label_font, bg=self.light_grey)
         self.label_bat_relay = tk.Label(self.frame_main_bat, text='Relays On:', font=self.label_font_bold, bg=self.light_grey)
@@ -1024,7 +1090,7 @@ class GUI(object):
         #############################################################
         # GRAPH OPTIONS CONTAINER ###################################
         #############################################################
-        self.label_gra_title = tk.Label(self.frame_main_gra, text='Graph Options', font=self.frame_font, bg=self.light_grey)
+        self.label_gra_title = tk.Label(self.frame_main_gra, text='Graphical Options', font=self.frame_font, bg=self.light_grey)
         self.label_gra_bat_options = tk.Label(self.frame_main_gra, text='Battery Packs to Plot:          ', font=self.label_font_bold, bg=self.light_grey)
         self.var_gra_b4 = tk.IntVar()
         self.var_gra_b1 = tk.IntVar()
