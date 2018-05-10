@@ -4,7 +4,7 @@
 # - Allows for graphical display of speed vs. range relationship for different current conditions
 #
 # Author: Zach Duguid
-# Last Updated: 07/23/2017
+# Last Updated: 05/10/18
 
 
 import math
@@ -23,12 +23,14 @@ class GliderModel(object):
         ''' initialize glider model object and define model parameters  
         '''
         # modeling parameters
-        self.capacity_li_pri = 12167        # non-rechargable
-        self.capacity_li_sec = 3200         # rechargable 
-        self.constant_transit_pwr = 5.5     # total transit power [W], assumes 5W mass spectrometer and 0.5W vehicle
-        self.constant_survey_pwr = 12.5     # total survey power [W], assumes 12W mass spectrometer and 0.5W vehicles 
-        self.c1 = 0.5213                    # coefficient from graphical fit
-        self.c2 = 0.3467                    # coefficient from graphical fit
+        self.capacity_li_pri = 10000        # non-rechargable primary batteries (includes temperature de-rating)
+        self.capacity_li_ion = 3000         # rechargeable batteries (includes temperature de-rating)
+        self.name_li_ion = "Li ion"         # name of rechargeable batteries (to appear in plots)
+        self.name_li_pri = "Li primary"
+        self.hotel_transit = 1.0            # hotel load in transity mode [W]
+        self.hotel_survey = 7.0             # hotel load in survey mode [W] 
+        self.c1 = 0.450                     # coefficient from graphical fit
+        self.c2 = 0.385                     # coefficient from graphical fit
         self.T_range = 0                    # max range achieved by glider (entirely transit mode)
         self.T_range_v = None               # speed associated with max range
         self.S_range = 0                    # min range achieved by glider (entirely survey mode)
@@ -63,13 +65,16 @@ class GliderModel(object):
         self.font_prop = font_manager.FontProperties(size=14)   # specify legend font
 
 
-    def get_range_data(self, constant_transit_pwr, constant_survey_pwr):
+    def get_range_data(self, hotel_transit, hotel_survey):
         ''' extracts range data as a function of through-water-speed and maintains the maximum range achieved   
         '''
         # get list of velocties, ocean currents, and percents to determine desired data
-        velocity = [float(element) for element in (np.linspace(0.00, 2.5, 251))]
-        ocean_currents = [str(round(element, 2)) for element in np.linspace(0.00, 1.78, 179)]
+        velocity = [float(str(round(element, 3))) for element in np.linspace(0.00, 1.5, 1501)]
+        ocean_currents = [str(round(element, 3)) for element in np.linspace(0.00, 1.5, 1500)]
         percent = range(101)
+        hr_to_s = 3600
+        km_to_m = 1000
+        unit_conversion = 3600.0/1000.0
 
         # initialize lists for speed vs. range plot for the user specified ocean current speed
         self.T_vel_dist = []                # transit distance as function of speed
@@ -81,8 +86,8 @@ class GliderModel(object):
         # initialize buoyancy parameters from previously performed study
         self.B_range_v = 0.37               # buoyancy speed [m/s] 
         self.B_range_p = 6.7                # buoyancy power [W]
-        self.B_range_t = (self.capacity / self.B_range_p)*3600      # buoyancy time [s]
-        self.B_range_x = (self.B_range_v * self.B_range_t)/1000     # buoyance range [km]
+        self.B_range_t = (self.capacity / self.B_range_p)*hr_to_s      # buoyancy time [s]
+        self.B_range_x = (self.B_range_v * self.B_range_t)/km_to_m     # buoyance range [km]
 
         # initialize 
         self.T_current_x = []               # transit max range dependent on ocean current c
@@ -113,10 +118,10 @@ class GliderModel(object):
                 prop_power = self.get_prop_power(v)
 
                 # determine range achieved in transit and survey modes 
-                total_range_T = (self.capacity * 3600/1000 * v_total) / (constant_transit_pwr + prop_power)
-                total_range_S = (self.capacity * 3600/1000 * v_total) / (constant_survey_pwr +  prop_power)
-                prop_range_T = (self.capacity * 3600/1000 * v) / (constant_transit_pwr + prop_power)
-                prop_range_S = (self.capacity * 3600/1000 * v) / (constant_survey_pwr +  prop_power)
+                total_range_T = (self.capacity * unit_conversion * v_total) / (hotel_transit + prop_power)
+                total_range_S = (self.capacity * unit_conversion * v_total) / (hotel_survey +  prop_power)
+                prop_range_T = (self.capacity * unit_conversion * v) / (hotel_transit + prop_power)
+                prop_range_S = (self.capacity * unit_conversion * v) / (hotel_survey +  prop_power)
 
                 # append values if the ocean current c is the same as the user specified speed
                 if c == str(self.current_speed):
@@ -128,15 +133,15 @@ class GliderModel(object):
                     T_range = total_range_T                         # [km], maximize this term
                     T_range_x = prop_range_T                        # [km], use this term when applying ocean currents
                     T_range_v = v                                   # [m/s]
-                    T_range_p = prop_power + constant_transit_pwr   # [W]       
-                    T_range_t = (self.capacity/T_range_p)*3600      # [s]
+                    T_range_p = prop_power + hotel_transit          # [W]       
+                    T_range_t = (self.capacity/T_range_p)*hr_to_s   # [s]
 
                 if total_range_S > S_range:
                     S_range = total_range_S                         # [km], maximize this term
                     S_range_x = prop_range_S                        # [km], use this term when applying ocean currents
                     S_range_v = v                                   # [m/s]
-                    S_range_p = prop_power + constant_survey_pwr    # [W]
-                    S_range_t = (self.capacity/S_range_p)*3600      # [s]  
+                    S_range_p = prop_power + hotel_survey           # [W]
+                    S_range_t = (self.capacity/S_range_p)*hr_to_s   # [s]  
 
             # extract values if the ocean current c is the same as the user specified speed
             if c == str(self.current_speed):
@@ -176,7 +181,7 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            plt.title('Glider Range as Function of Speed \n (Capacity: ' + str(self.capacity) + ' WHrs) \n (Ocean Currents: ' + str(self.current_speed) + ' m/s)', **self.title_font)
+            plt.title('Glider Range as Function of Vehicle Speed \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs) \n (Ocean Currents: ' + str(self.current_speed) + ' m/s)', **self.title_font)
             plt.xlabel('Speed [m/s]', **self.axis_font)
             plt.ylabel('Range [km]', **self.axis_font)
             plt.plot(velocity, self.T_vel_dist, self.T_range_color, lw=self.major_line_width)
@@ -194,7 +199,7 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            plt.title('Glider Range as Function of Power Mode \n (Capacity: ' + str(self.capacity) + ' WHrs) \n (Ocean Currents: ' + str(self.current_speed) + ' m/s)', **self.title_font)
+            plt.title('Glider Range as Function of Transit Mode \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs) \n (Ocean Currents: ' + str(self.current_speed) + ' m/s)', **self.title_font)
             plt.xlabel('Percentage of Power used in transit mode [%]', **self.axis_font)
             plt.ylabel('Range [km]', **self.axis_font)
             plt.plot(percent, self.total_dist, self.total_color, lw=self.major_line_width)
@@ -211,13 +216,13 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels() + ax.get_zticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            x = np.arange(0, 2.0, 0.01)
-            y = np.arange(0, 2.5, 0.01)
+            x = np.arange(0, 1.5, 0.01)
+            y = np.arange(0, 1.5, 0.01)
             X, Y = np.meshgrid(x, y)
-            z = np.array([self.get_range(x, y, self.capacity, self.constant_transit_pwr) for x,y in zip(np.ravel(X), np.ravel(Y))])
+            z = np.array([self.get_range(x, y, self.capacity, self.hotel_transit) for x,y in zip(np.ravel(X), np.ravel(Y))])
             Z = z.reshape(X.shape)
             ax.plot_surface(X, Y, Z, cmap='gnuplot')
-            ax.set_title('Glider Range as Function of Vehicle Speed and Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
+            ax.set_title('Glider Range as Function of Vehicle Speed and Ocean Current Speed \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
             ax.set_xlabel('Vehicle Speed [m/s]', **self.axis_font)
             ax.set_ylabel('Ocean Current Speed [m/s]', **self.axis_font)
             ax.set_zlabel('Range [km]', **self.axis_font)
@@ -230,13 +235,13 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels() + ax.get_zticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            x = np.arange(0, 2.0, 0.01)
-            y = np.arange(0, 2.5, 0.01)
+            x = np.arange(0, 1.5, 0.01)
+            y = np.arange(0, 1.5, 0.01)
             X, Y = np.meshgrid(x, y)
-            z = np.array([self.get_range(x, y, self.capacity, self.constant_survey_pwr) for x,y in zip(np.ravel(X), np.ravel(Y))])
+            z = np.array([self.get_range(x, y, self.capacity, self.hotel_survey) for x,y in zip(np.ravel(X), np.ravel(Y))])
             Z = z.reshape(X.shape)
             ax.plot_surface(X, Y, Z, cmap='gnuplot')
-            ax.set_title('Glider Range as Function of Vehicle Speed and Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
+            ax.set_title('Glider Range as Function of Vehicle Speed and Ocean Current Speed \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
             ax.set_xlabel('Vehicle Speed [m/s]', **self.axis_font)
             ax.set_ylabel('Ocean Current Speed [m/s]', **self.axis_font)
             ax.set_zlabel('Range [km]', **self.axis_font)
@@ -249,13 +254,13 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            plt.title('Glider Range as Function of Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
+            plt.title('Glider Range as Function of Ocean Current Speed \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
             plt.xlabel('Ocean Current Speed [m/s]', **self.axis_font)
             plt.ylabel('Range [km]', **self.axis_font)
-            plt.plot(ocean_currents, self.T_current_x, self.T_range_color, lw=self.major_line_width)
-            plt.plot(ocean_currents, self.T_current_y, self.T_range_color+'--', lw=self.minor_line_width)
-            plt.plot(ocean_currents, self.S_current_x, self.S_range_color, lw=self.major_line_width)
-            plt.plot(ocean_currents, self.S_current_y, self.S_range_color+'--', lw=self.minor_line_width)
+            plt.plot([float(c) for c in ocean_currents], self.T_current_x, self.T_range_color, lw=self.major_line_width)
+            plt.plot([float(c) for c in ocean_currents], self.T_current_y, self.T_range_color+'--', lw=self.minor_line_width)
+            plt.plot([float(c) for c in ocean_currents], self.S_current_x, self.S_range_color, lw=self.major_line_width)
+            plt.plot([float(c) for c in ocean_currents], self.S_current_y, self.S_range_color+'--', lw=self.minor_line_width)
             plt.legend(['Transit Range (Optimized)', 'Transit Range (Original)', 'Survey Range (Optimized)', 'Survey Range (Original)'], prop=self.font_prop)
             plt.grid()
             plt.show()
@@ -267,11 +272,11 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            plt.title('Glider Range Increase as Function of Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
+            plt.title('Glider Range as Function of Ocean Current Speed \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
             plt.xlabel('Ocean Current Speed [m/s]', **self.axis_font)
             plt.ylabel('Percent [%]', **self.axis_font)
-            plt.plot(ocean_currents, self.T_current_i, self.T_range_color, lw=self.major_line_width)
-            plt.plot(ocean_currents, self.S_current_i, self.S_range_color, lw=self.major_line_width)
+            plt.plot([float(c) for c in ocean_currents], self.T_current_i, self.T_range_color, lw=self.major_line_width)
+            plt.plot([float(c) for c in ocean_currents], self.S_current_i, self.S_range_color, lw=self.major_line_width)
             plt.legend(['Transit Mode', 'Survey Mode'], prop=self.font_prop)
             plt.grid()
             plt.show()
@@ -283,13 +288,12 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            plt.title('Glider Speed as Function of Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
+            plt.title('Glider Range as Function of Ocean Current Speed \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
             plt.xlabel('Ocean Current Speed [m/s]', **self.axis_font)
             plt.ylabel('Glider Speed [m/s]', **self.axis_font)
-            plt.plot(ocean_currents, self.T_current_v, self.T_range_color, lw=self.major_line_width)
-            plt.plot(ocean_currents, self.S_current_v, self.S_range_color, lw=self.major_line_width)
-            plt.plot(ocean_currents, [self.B_range_v]*len(ocean_currents), self.total_color + '--', lw=self.major_line_width)
-            plt.legend(['Transit Mode', 'Survey Mode', 'Buoyancy Engine Speed'], prop=self.font_prop)
+            plt.plot([float(c) for c in ocean_currents], self.T_current_v, self.T_range_color, lw=self.major_line_width)
+            plt.plot([float(c) for c in ocean_currents], self.S_current_v, self.S_range_color, lw=self.major_line_width)
+            plt.legend(['Transit Mode', 'Survey Mode'], prop=self.font_prop)
             plt.grid()
             plt.show()
 
@@ -300,13 +304,13 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            plt.title('Vehcile Power as Function of Ocean Current Speed \n (Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
+            plt.title('Glider Range as Function of Ocean Current Speed \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
             plt.xlabel('Ocean Current Speed [m/s]', **self.axis_font)
             plt.ylabel('Power [W]', **self.axis_font)
-            plt.plot(ocean_currents, self.T_current_p, self.T_range_color, lw=self.major_line_width)
-            plt.plot(ocean_currents, [constant_transit_pwr]*len(ocean_currents), self.T_range_color+'--', lw=self.minor_line_width)
-            plt.plot(ocean_currents, self.S_current_p, self.S_range_color, lw=self.major_line_width)
-            plt.plot(ocean_currents, [constant_survey_pwr]*len(ocean_currents), self.S_range_color+'--', lw=self.minor_line_width)
+            plt.plot([float(c) for c in ocean_currents], self.T_current_p, self.T_range_color, lw=self.major_line_width)
+            plt.plot([float(c) for c in ocean_currents], [hotel_transit]*len(ocean_currents), self.T_range_color+'--', lw=self.minor_line_width)
+            plt.plot([float(c) for c in ocean_currents], self.S_current_p, self.S_range_color, lw=self.major_line_width)
+            plt.plot([float(c) for c in ocean_currents], [hotel_survey]*len(ocean_currents), self.S_range_color+'--', lw=self.minor_line_width)
             plt.legend(['Transit Power', 'Transit Hotel Load', 'Survey Power', 'Survey Hotel Load'], prop=self.font_prop)
             plt.grid()
             plt.show()
@@ -320,7 +324,8 @@ class GliderModel(object):
         prop_power = self.get_prop_power(vehicle_speed)
 
         # determine range and return
-        return((capacity * 3600/1000 * v_total) / (hotel_pwr + prop_power))
+        unit_conversion = 3600.0/1000.0
+        return((capacity * unit_conversion * v_total) / (hotel_pwr + prop_power))
 
 
     def get_prop_power(self, v):
@@ -451,7 +456,9 @@ class GliderModel(object):
         bmap.drawstates(linewidth=self.base_lines)
         bmap.drawcoastlines(linewidth=self.base_lines)
         bmap.drawmapboundary(fill_color=self.base_water)
+        plt.title('Glider Range from  \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs) \n (Ocean Currents: ' + str(self.current_speed) + ' m/s)', **self.title_font)
         plt.title('Glider Range from Nassau, Bahamas \n (Capacity: ' + str(self.capacity) + ' WHrs) \n (Ocean Currents: ' + str(self.current_speed) + ' m/s)', **self.title_font)
+
 
         # determine achievable range limits
         self.lat_list_T, self.lon_list_T = self.get_range_perimeter(self.lat, self.lon, self.T_range_x)
@@ -510,19 +517,20 @@ if __name__ == '__main__':
     model = GliderModel()
 
     # determine model and graphing parameters 
-    model.plot_set = set(['speed-range', 'percent-range', 'current-power', 'current-range', 'current-increase', 'current-speed', '3d-transit-range', '3d-survey-range', 'map'])
-    constant_transit_pwr = model.constant_transit_pwr
-    constant_survey_pwr =  model.constant_survey_pwr
-    model.capacity = model.capacity_li_sec
+    model.plot_set = set(['speed-range', 'percent-range', 'current-power', 'current-range', 'current-increase', 'current-speed', '3d-transit-range', '3d-survey-range'])
+    hotel_transit = model.hotel_transit
+    hotel_survey =  model.hotel_survey
+    model.capacity = model.capacity_li_pri
+    model.capacity_name = model.name_li_pri
     model.lat = 25.10                       # lat of the Bahamas  
     model.lon = -77.25                      # lon of the Bahamas
     model.map_width = 8e6                   # desired width of the world map
-    model.buoyancy_on = False               # determine whether or not to plot buoyancy transit mode range limits 
-    model.current_speed = 1.78              # the average speed of the gulf stream [m/s]
+    model.buoyancy_on = True                # determine whether or not to plot buoyancy transit mode range limits 
+    model.current_speed = 1.5               # the average speed of the gulf stream [m/s]
     model.current_dir = -40                 # chosen direction for the gulf stream current [degrees]
 
     # extract speed and range data to plot
-    model.get_range_data(constant_transit_pwr, constant_survey_pwr)
+    model.get_range_data(hotel_transit, hotel_survey)
 
     # plot range data on world map as necessary
     if 'map' in model.plot_set:
