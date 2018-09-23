@@ -1,5 +1,5 @@
 <a href="https://github.com/zduguid">
-    <img src="images/glider2.png" alt="glider_image" align="right" height="70">
+    <img src="README/glider2.png" alt="glider_image" align="right" height="70">
 </a>
 
 
@@ -42,11 +42,11 @@ The Battery GUI can be operated from any computer given that the appropriate dep
 
 ### Slocum Glider Overview
 
-<img src="images/glider_diagram.png" alt="glider_diagram" align="center" width="900">
+<img src="README/glider_diagram.png" alt="glider_diagram" align="center" width="900">
 
 There are four distinct battery packs on the glider: the pitch pack, the payload pack, the aft-short pack, and the aft-long pack. Communication with the battery packs occurs via a SAIL bus, which uses the SAIL interface. Using the SAIL interface, the pitch pack is addressed using ```#bat4```, the payload pack is addressed using ```#bat1```, the aft-short pack is addressed using ```#bat3```, and the aft-long pack is addressed using ```#bat2```. In our test configuration, the power supply is addressed using ```#ada```. These addresses are utilized in the ```battery_gui.py``` script in order to communicate with the battery packs and power supply. The full test configuration can be seen in the diagram below. 
 
-<img src="images/block_diagram.jpg" alt="block_diagram" align="center" width="900">
+<img src="README/block_diagram.jpg" alt="block_diagram" align="center" width="900">
 
 
 ### Other Helpful Commands and Links 
@@ -94,7 +94,7 @@ There are four distinct battery packs on the glider: the pitch pack, the payload
 
 The Battery System GUI allows for interaction between your computer and the Slocum Glider battery pack system, as well as the power supply system, both via the SAIL interface. The following image displays the default GUI window when the ```battery_gui.py``` script is executed: 
 
-<img src="images/GUI_example.png" alt="GUI_example" align="center" width="900">
+<img src="README/GUI_example.png" alt="GUI_example" align="center" width="900">
 
 Each frame within the main GUI window provides distinct options for the user. Once the user selects their desired input within each frame, they must then select the Execute button within the same frame in order for the command to be sent to the SAIL bus. Below the four main frames, the user has access to three buttons. The Recharge Off button will immediately turn off all power being supplied to the glider, the Close button will terminate the GUI window, and the Connect to Serial Bus button will establish a connection with the serial port provided that their is an active serial port available. 
 
@@ -132,49 +132,49 @@ The user has the ability to toggle on and off the following plots by adding thei
 
 * ```"speed-range"```
 
-<img src="images/speed_range1.png" alt="speed_range1" align="center" width="900">
-<img src="images/speed_range2.png" alt="speed_range2" align="center" width="900">
+<img src="README/speed_range1.png" alt="speed_range1" align="center" width="900">
+<img src="README/speed_range2.png" alt="speed_range2" align="center" width="900">
 
 
 * ```"3d-transit-range"```
 
-<img src="images/speed_current_range1.png" alt="speed_current_range1" align="center" width="900">
+<img src="README/speed_current_range1.png" alt="speed_current_range1" align="center" width="900">
 
 
 * ```"3d-survey-range"```
 
-<img src="images/speed_current_range2.png" alt="speed_current_range2" align="center" width="900">
+<img src="README/speed_current_range2.png" alt="speed_current_range2" align="center" width="900">
 
 
 * ```"current-range"```
 
-<img src="images/current_range.png" alt="current_range" align="center" width="900">
+<img src="README/current_range.png" alt="current_range" align="center" width="900">
 
 
 * ```"current-increase"```
 
-<img src="images/current_percent.png" alt="current_percent" align="center" width="900">
+<img src="README/current_percent.png" alt="current_percent" align="center" width="900">
 
 
 * ```"current-speed"```
 
-<img src="images/current_speed.png" alt="current_speed" align="center" width="900">
+<img src="README/current_speed.png" alt="current_speed" align="center" width="900">
 
 
 * ```"current-power"```
 
-<img src="images/current_power.png" alt="current_power" align="center" width="900">
+<img src="README/current_power.png" alt="current_power" align="center" width="900">
 
 
 * ```"map"```
 
-<img src="images/map1.png" alt="map1" align="center" width="900">
-<img src="images/map2.png" alt="map2" align="center" width="900">
+<img src="README/map1.png" alt="map1" align="center" width="900">
+<img src="README/map2.png" alt="map2" align="center" width="900">
 
 
 
 ## Author
-* **[Zach Duguid](https://github.com/zduguid)**
+* **[Zach Duguid](https://zduguid.github.io)**
 
 ## Acknowledgements
 * Woods Hole Oceanographic Institution (WHOI)

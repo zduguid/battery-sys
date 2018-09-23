@@ -70,7 +70,7 @@ class GliderModel(object):
         '''
         # get list of velocties, ocean currents, and percents to determine desired data
         velocity = [float(str(round(element, 3))) for element in np.linspace(0.00, 1.5, 1501)]
-        ocean_currents = [str(round(element, 3)) for element in np.linspace(0.00, 1.5, 1500)]
+        ocean_currents = [str(round(element, 3)) for element in np.linspace(-1.49, 1.5, 3000)]
         percent = range(101)
         hr_to_s = 3600
         km_to_m = 1000
