@@ -27,8 +27,8 @@ class GliderModel(object):
         self.capacity_li_ion = 3000         # rechargeable batteries (includes temperature de-rating)
         self.name_li_ion = "Li ion"         # name of rechargeable batteries (to appear in plots)
         self.name_li_pri = "Li primary"
-        self.hotel_transit = 1.0            # hotel load in transity mode [W]
-        self.hotel_survey = 7.0             # hotel load in survey mode [W] 
+        self.hotel_transit = 5.0            # hotel load in transity mode [W]
+        self.hotel_survey = 13.0             # hotel load in survey mode [W] 
         self.c1 = 0.450                     # coefficient from graphical fit
         self.c2 = 0.385                     # coefficient from graphical fit
         self.T_range = 0                    # max range achieved by glider (entirely transit mode)
@@ -288,12 +288,12 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            plt.title('Glider Range as Function of Ocean Current Speed \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
+            plt.title('Optimal Glider Speed vs. Ocean Current Speed', **self.title_font)
             plt.xlabel('Ocean Current Speed [m/s]', **self.axis_font)
-            plt.ylabel('Glider Speed [m/s]', **self.axis_font)
+            plt.ylabel('Optimal Glider Speed [m/s]', **self.axis_font)
             plt.plot([float(c) for c in ocean_currents], self.T_current_v, self.T_range_color, lw=self.major_line_width)
             plt.plot([float(c) for c in ocean_currents], self.S_current_v, self.S_range_color, lw=self.major_line_width)
-            plt.legend(['Transit Mode', 'Survey Mode'], prop=self.font_prop)
+            plt.legend(['Low Power Transit Mode', 'High Power Survey Mode'], prop=self.font_prop)
             plt.grid()
             plt.show()
 
@@ -304,14 +304,14 @@ class GliderModel(object):
             for label in (ax.get_xticklabels() + ax.get_yticklabels()):
                 label.set_fontname('Arial')
                 label.set_fontsize(14)
-            plt.title('Glider Range as Function of Ocean Current Speed \n (' + self.capacity_name + ' Capacity: ' + str(self.capacity) + ' WHrs)', **self.title_font)
+            plt.title('Optimal Power Usage vs. Ocean Current Speed', **self.title_font)
             plt.xlabel('Ocean Current Speed [m/s]', **self.axis_font)
-            plt.ylabel('Power [W]', **self.axis_font)
+            plt.ylabel('Optimal Power Usage [W]', **self.axis_font)
             plt.plot([float(c) for c in ocean_currents], self.T_current_p, self.T_range_color, lw=self.major_line_width)
-            plt.plot([float(c) for c in ocean_currents], [hotel_transit]*len(ocean_currents), self.T_range_color+'--', lw=self.minor_line_width)
+            plt.plot([float(c) for c in ocean_currents], [hotel_transit]*len(ocean_currents), self.T_range_color+'--', lw=self.major_line_width, alpha=0.5)
             plt.plot([float(c) for c in ocean_currents], self.S_current_p, self.S_range_color, lw=self.major_line_width)
-            plt.plot([float(c) for c in ocean_currents], [hotel_survey]*len(ocean_currents), self.S_range_color+'--', lw=self.minor_line_width)
-            plt.legend(['Transit Power', 'Transit Hotel Load', 'Survey Power', 'Survey Hotel Load'], prop=self.font_prop)
+            plt.plot([float(c) for c in ocean_currents], [hotel_survey]*len(ocean_currents), self.S_range_color+'--', lw=self.major_line_width, alpha=0.5)
+            plt.legend(['Transit Total Power', 'Transit Hotel Load', 'Survey Total Power', 'Survey Hotel Load'], prop=self.font_prop)
             plt.grid()
             plt.show()
 
@@ -517,7 +517,7 @@ if __name__ == '__main__':
     model = GliderModel()
 
     # determine model and graphing parameters 
-    model.plot_set = set(['speed-range', 'percent-range', 'current-power', 'current-range', 'current-increase', 'current-speed', '3d-transit-range', '3d-survey-range'])
+    model.plot_set = set(['current-power', 'current-speed'])
     hotel_transit = model.hotel_transit
     hotel_survey =  model.hotel_survey
     model.capacity = model.capacity_li_pri
